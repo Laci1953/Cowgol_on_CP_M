@@ -22,11 +22,11 @@ HiTech's LINK is used to link the object files.
 
 The following executables are needed:
  - $EXEC.COM , the "batch processor" from the HiTech's C compiler
- - COWGOL.COM , the component that launches all other executables
- - COWFE.COM , part of the Cowgol compiler
- - COWBE.COM , part of the Cowgol compiler
- - COWLINK.COM , part of the Cowgol compiler
- - COWFIX.COM , interface to Z80AS
+ - COWGOL.COM , the component that launches all other executables (a modified variant of the HiTech's C.COM)
+ - COWFE.COM , part of the Cowgol compiler (a modified variant of the original COWFE written by David Given)
+ - COWBE.COM , part of the Cowgol compiler (a modified variant of the original COWBE written by David Given)
+ - COWLINK.COM , part of the Cowgol compiler (a modified variant of the original COWLINK written by David Given)
+ - COWFIX.COM , interface to Z80AS (transforms the COWLINK's output to a syntax accepted by Z80AS)
  - Z80AS.COM , the assembler ( see https://github.com/Laci1953/Z80AS )
  - LNK.COM , the HiTech's linker
 
