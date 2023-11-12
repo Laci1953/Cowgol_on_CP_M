@@ -10,7 +10,11 @@ To compile a Cowgol source file or to build an executable starting from a Cowgol
  >cowgol [-c] [-m] source ([source]...)
 
 More than one source file may be specified (with extensions: .cow = cowgol source file, .as = assembler source file)
+
 If you want just to compile/assemble the files, the option -c must be used.
+
 If the option -c is not specified, the files will be first compiled/assembled, then linked into a CP/M executable (named after the first file).
+
 The option -m builds a memory map for the executable.
+
 HiTech's LINK is used to link the object files.
