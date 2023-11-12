@@ -32,6 +32,6 @@ The following executables are needed:
 
 The EXE folder contains the executables.
 
-The Examples folder contains examples of compilation sessios.
+The Examples folder contains examples of compilation sessions.
 
 
