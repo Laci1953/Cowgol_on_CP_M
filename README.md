@@ -7,7 +7,7 @@ Here you will find a complete Cowgol development environment, hosted on CP/M, fo
 
 To compile a Cowgol source file or to build an executable starting from a Cowgol source file, the following command is used:
 
-cowgol [-c] [-m] source ([source]...)
+COWGOL [-c] [-m] source ([source]...)
 
 More than one source file may be specified (with extensions: .cow = cowgol source file, .as = assembler source file)
 
