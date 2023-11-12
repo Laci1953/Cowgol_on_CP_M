@@ -21,7 +21,6 @@ HiTech's LINK is used to link the object files.
 
 The following executables are needed:
  - $EXEC.COM , the "batch processor" from the HiTech's C compiler
- - LINK.COM , the HiTech's linker
  - COWGOL.COM , the component that launches all other executables
  - COWFE.COM , part of the Cowgol compiler
  - COFBE.COM , part of the Cowgol compiler
@@ -29,5 +28,9 @@ The following executables are needed:
  - COWFIX.COM , interface to Z80AS
  - Z80AS.COM , the assembler ( see https://github.com/Laci1953/Z80AS )
  - LNK.COM , the HiTech's linker
+
+The EXE folder contains the executables.
+
+The Examples folder contains examples of compilation sessios.
 
 
