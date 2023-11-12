@@ -30,7 +30,11 @@ The following executables are needed:
  - Z80AS.COM , the assembler ( see https://github.com/Laci1953/Z80AS )
  - LNK.COM , the HiTech's linker
 
+Also, the library file "cowgol.coo" must be present.
+
 The EXE folder contains the executables.
+
+The INCLUDE folder contains the include files and the library file.
 
 The Examples folder contains examples of compilation sessions.
 
