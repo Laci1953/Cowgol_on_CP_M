@@ -20,7 +20,7 @@ The option -m builds a memory map for the executable.
 HiTech's LINK is used to link the object files.
 
 The following executables are needed:
- - $EXEC.$$$ , the "batch processor" from the HiTech's C compiler
+ - $$EXEC.COM , the "batch processor" from the HiTech's C compiler
  - LINK.COM , the HiTech's linker
  - COWGOL.COM , the component that launches all other executables
  - COWFE.COM , part of the Cowgol compiler
