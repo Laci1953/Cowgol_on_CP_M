@@ -12,7 +12,7 @@ COWGOL [-c] [-m] source ([source]...)
 
 More than one source file may be specified (with extensions: .cow = cowgol source file, .as = assembler source file)
 
-If you want just to compile/assemble the files, the option -c must be used.
+If you want just to compile/assemble the files, the option -c must be used. The object code format is the HiTech's object code format.
 
 If the option -c is not specified, the files will be first compiled/assembled, then linked into a CP/M executable (named after the first file).
 
