@@ -17,10 +17,10 @@
 # Cowgol standard library
 
 # Uncomment these if you'd like to abstract the includes away.
-# include "cowgol.coh";
-# include "file.coh";
-# include "strings.coh";
-# include "malloc.coh";
+include "cowgol.coh";
+include "file.coh";
+include "strings.coh";
+include "malloc.coh";
 
 # Print a properly formatted 8-bit hex number to a file.
 sub FCBPutHex8(fcb: [FCB], number: uint8) is
