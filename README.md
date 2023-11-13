@@ -15,7 +15,7 @@ More than one source file may be specified (with extensions: .cow = cowgol sourc
 
 The first file must be a Cowgol file.
 
-If you want just to compile/assemble the files, the option -C must be used. The object code format is the HiTech's object code format.
+If you want just to compile/assemble the files, the option -C must be used. 
 
 If the option -C is not specified, the files will be first compiled/assembled, then linked into a CP/M executable (named after the first file in the list).
 
