@@ -9,7 +9,7 @@ Here you will find a complete Cowgol development environment, hosted on CP/M, fo
 
 To compile a Cowgol source file or to build an executable starting from a Cowgol source file, the following command is used:
 
-COWGOL [-C] [-M] [-Llibfile] source ([source]...)
+COWGOL [-C] [-Mmapfile] [-Llibfile] source ([source]...)
 
 More than one source file may be specified (with extensions: .cow = cowgol source file, .as = assembler source file)
 
@@ -21,7 +21,7 @@ If the option -C is not specified, the files will be first compiled/assembled, t
 
 The option -M builds a memory map for the executable.
 
-The option -Lfile adds the file "libfile.lib" to the link options.
+The option -Lfile adds the file "libfile.lib" to the link list.
 
 HiTech's LINK is used to link the object files.
 
