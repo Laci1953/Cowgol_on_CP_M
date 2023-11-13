@@ -13,7 +13,7 @@ COWGOL [-C] [-Mmapfile] [-Llibfile] source1.cow [ source2.cow | source.as ] ...
 
 More than one source file may be specified (with extensions: .cow = cowgol source file, .as = assembler source file)
 
-The first file must be a Cowgol file.
+The first file must be a Cowgol source file.
 
 If you want just to compile/assemble the files, the option -C must be used. 
 
