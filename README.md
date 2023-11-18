@@ -7,11 +7,11 @@ Cowgol is a programming language for very small systems, including Z80 computers
 
 Here you will find a complete Cowgol development environment, hosted on CP/M, for Z80 computers.
 
-To compile Cowgol source files (and, optionally, assembler files), or to build an executable starting from Cowgol source files (and, optionally, assembler files), the following command is used:
+To compile Cowgol source files (and, optionally, C and assembler files), or to build an executable starting from Cowgol source files (and, optionally, C & assembler files), the following command is used:
 
-COWGOL [-C] [-Mmapfile] [-Llibfile] source1.cow [ source2.cow | source.as ] ...
+COWGOL [-C] [-Mmapfile] [-Llibfile] source1.cow [ source2.cow | source.c | source.as ] ...
 
-More than one source file may be specified (with extensions: .cow = cowgol source file, .as = assembler source file)
+More than one source file may be specified (with extensions: .cow = cowgol source file, .c = C source file, .as = assembler source file)
 
 The first file must be a Cowgol source file.
 
@@ -33,7 +33,11 @@ The following executables are needed:
  - COWLINK.COM , part of the Cowgol compiler (a modified variant of the original COWLINK written by David Given)
  - COWFIX.COM , interface to Z80AS (transforms the COWLINK's output to a syntax accepted by Z80AS)
  - Z80AS.COM , the assembler ( see https://github.com/Laci1953/Z80AS )
- - LNK.COM , the HiTech's linker
+ - LINK.COM , the HiTech's linker
+ - CPP.COM , the HiTech's C pre-processor
+ - P1.COM , the HiTech's C compiler pass 1
+ - CGEN.COM , the HiTech's C compiler pass 2
+ - OPTIM.COM , the HiTech's C compiler optimizer
 
 Also, the library file "cowgol.coo" must be present.
 
