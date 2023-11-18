@@ -5,7 +5,7 @@ Cowgol development environment hosted on Z80 computers running CP/M
 
 Cowgol is a programming language for very small systems, including Z80 computers ( see https://github.com/davidgiven/cowgol ).
 
-Here you will find a complete Cowgol development environment, hosted on CP/M, for Z80 computers.
+You will find here a complete Cowgol development environment, hosted on CP/M, for Z80 computers.
 
 To compile Cowgol source files (and, optionally, C and assembler files), or to build an executable starting from Cowgol source files (and, optionally, C & assembler files), the following command is used:
 
