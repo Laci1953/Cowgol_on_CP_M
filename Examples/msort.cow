@@ -1,0 +1,127 @@
+################################
+#        Cowgol program        #
+#                              #
+# Sorting 1000 random integers #
+#                              #
+# calls:                       #
+#  assembler routine xrndseed  #
+#  assembler routine xrnd      #
+#  C routine mergeSort         #
+#                              #
+# Ladislau Szilagyi, Nov. 2023 #
+################################
+
+sub print_char(c: uint8) is
+	@asm "ld a, (", c, ")";
+	@asm "ld e, a";
+	@asm "ld c, 2";
+	@asm "call 5";
+end sub;
+
+sub print(ptr: [uint8]) is
+    loop
+        var c := [ptr];
+        if c == 0 then
+            return;
+        end if;
+        print_char(c);
+        ptr := ptr + 1;
+    end loop;
+end sub;
+
+sub UIToA(value: uint16, base: uint8, buffer: [uint8]): (ptr: [uint8]) is
+	ptr := buffer;
+	loop
+		var rem := value % (base as uint16);
+		value := value / (base as uint16);
+		if rem < 10 then
+			rem := rem + '0';
+		else
+			rem := rem + ('a' - 10);
+		end if;
+		[ptr] := rem as uint8;
+		ptr := @next ptr;
+
+		if value == 0 then
+			break;
+		end if;
+	end loop;
+
+	var s1 := buffer;
+	var s2 := @prev ptr;
+	while s2 > s1 loop
+		var c := [s1];
+		[s1] := [s2];
+		[s2] := c;
+		s1 := @next s1;
+		s2 := @prev s2;
+	end loop;
+
+	[ptr] := 0;
+end sub;
+
+sub print_i16(value: uint16) is
+    var buffer: uint8[12];
+	var pe := UIToA(value, 10, &buffer[0]);
+	print(&buffer[0]);
+end sub;
+
+record Integer is
+  v: uint16;
+end record;
+
+var Unsorted: Integer[1000];
+var p: [uint16];
+p := &Unsorted[0].v;
+
+var size: uint16;
+var i: uint16;
+
+sub random(): (n: uint16) is
+@asm "call _xrnd"; 		#calls assembler routine
+@asm "ld (", n, "),hl";
+end sub;
+
+### start ###
+
+@asm "call _xrndseed"; 		#calls assembler routine
+
+i := 0;
+size := 999;
+
+while i != 1000 loop
+  Unsorted[i].v := random();
+  i := i + 1;
+end loop;
+
+print("\n\rUnsorted array:\n\r");
+
+i := 0;
+while i != @sizeof Unsorted loop
+  print_i16(Unsorted[i].v);
+  print(",");
+  i := i + 1;
+end loop;
+
+@asm "ld hl,(", size, ")";
+@asm "push hl";			# r on stack as param # 3
+@asm "ld hl,0";
+@asm "push hl";			# l on stack as param # 2
+@asm "ld hl,(", p, ")";
+@asm "push hl";			# vector addr on stack as param # 1
+@asm "call _mergeSort";		# calls C routine msort(int* array, int l, int r)
+@asm "pop bc";			# drops C routine params
+@asm "pop bc";			# drops C routine params
+
+# now array is sorted!
+
+print("\n\rSorted array:\n\r");
+
+i := 0;
+while i != 1000 loop
+  print_i16(Unsorted[i].v);
+  print(",");
+  i := i + 1;
+end loop;
+
+@asm "rst 0"; #exit
