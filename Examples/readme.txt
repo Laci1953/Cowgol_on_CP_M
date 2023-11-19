@@ -364,6 +364,19 @@ Source files:
 - merges.c
 - rand.as
 
+Fragment of "dynmsort.cow":
+
+...
+RandSeed();
+Unsorted := Alloc(2000) as intstring;
+PopulateArray(Unsorted);
+PrintArray(Unsorted);
+MergeSort();
+PrintArray(Unsorted); # now is sorted !
+Exit();
+
+Compilation:
+
 c>cowgol -lc dynmsort.cow merges.c rand.as
 COWGOL COMPILER (CP/M-80) V2.0
 Copyright (C) David Given
