@@ -1,1 +1,33 @@
-x
+When your CP/M program is written using ONLY Cowgol source files, the original "malloc.coh" may be used without any problem.
+
+But, when you try to build CP/M programs that mix Cowgol and C source files, some modifications must be made to the original .coh files, in order to benefit from the Cowgol Alloc, Free, and other dynamic allocation functions.
+
+Practically, instead of using the "standard" include "cowgol.coh", you MUST use instead include "cowgolc.coh".
+
+The differences are minor, but essential.
+
+The "standard" cowgol.coh starts with these lines:
+
+var LOMEM: [uint8];
+@asm "ld hl, LOMEM";
+@asm "ld (", LOMEM, "), hl";
+
+var HIMEM: [uint8];
+@asm "ld hl, (6)";
+@asm "ld (", HIMEM, "), hl";
+
+The "custom" cowgolc.coh contains a small modification:
+
+var LOMEM: [uint8];
+@asm "ld hl,__Hbss"; # @asm "ld hl, LOMEM";
+@asm "ld (", LOMEM, "), hl";
+
+var HIMEM: [uint8];
+@asm "ld hl, (6)";
+@asm "ld (", HIMEM, "), hl";
+
+This sets the start of the Cowgol heap at the end of the BSS program section, allowing the C & Cowgol environments to "coexist" pecefully.
+
+Therefore, when you intend to use dynamic memory allocation in a mixed Cowgol + C environment, you MUST include this "custom" cowgolc.coh, instead of the "standard " cowgol.coh file.
+
+See in Examples the dynmsort.cow file (which is combined with merges.c & rand.as, to build the dynmsort.com program)
