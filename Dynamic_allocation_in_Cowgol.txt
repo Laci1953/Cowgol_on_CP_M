@@ -1,6 +1,14 @@
+In Cowgol, you may use dynamic memory functions (Alloc, Free, ...) including the "malloc.coh" file in your source file.
+ 
 When your CP/M program is written using ONLY Cowgol source files, the original "malloc.coh" may be used without any problem.
 
 But, when you try to build CP/M programs that mix Cowgol and C source files, some modifications must be made to the original .coh files, in order to benefit from the Cowgol Alloc, Free, and other dynamic allocation functions.
+
+The problem is caused by the fact that the original Cowgol runtime environment considered the "heap" as starting after the last byte of the executable code and finishing exactly below BDOS.
+
+With the new Cowgol + C runtime environment, the executable map contains 3 sequential concatenated program sections : text ( the code ), data ( initialized buffers ) and bss ( uninitialized buffers ).
+
+Therefore, the Cowgol heap area must start at the end of the bss program section.
 
 Practically, instead of using the "standard" include "cowgol.coh", you MUST use instead include "cowgolc.coh".
 
@@ -16,6 +24,8 @@ var HIMEM: [uint8];
 @asm "ld hl, (6)";
 @asm "ld (", HIMEM, "), hl";
 
+(the dynamic memory functions contained in malloc.coh use the variables LOMEM & HIMEM to define the start & stop boundaries of the heap )
+
 The "custom" cowgolc.coh contains a small modification:
 
 var LOMEM: [uint8];
@@ -26,8 +36,10 @@ var HIMEM: [uint8];
 @asm "ld hl, (6)";
 @asm "ld (", HIMEM, "), hl";
 
-This sets the start of the Cowgol heap at the end of the BSS program section, allowing the C & Cowgol environments to "coexist" pecefully.
+The value of __Hbss is declared and set by default as the "end of BSS" by the last tool in the Cowgol compile chain, the HiTech's LINK.
+
+This sets the start of the Cowgol heap at the end of the BSS program section, allowing the C & Cowgol environments to "coexist" peacefully.
 
 Therefore, when you intend to use dynamic memory allocation in a mixed Cowgol + C environment, you MUST include this "custom" cowgolc.coh, instead of the "standard " cowgol.coh file.
 
-See in Examples the dynmsort.cow file (which is combined with merges.c & rand.as, to build the dynmsort.com program)
+See in Examples the dynmsort.cow file (combined with merges.c & rand.as, will build the dynmsort.com program, which uses Alloc to obtain space for the integer vector to be sorted)
