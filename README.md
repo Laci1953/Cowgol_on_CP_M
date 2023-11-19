@@ -47,7 +47,9 @@ The EXE folder contains the executables.
 
 The runtime environment is provided with a 512 bytes stack, larger than the original 128 bytes stack.
 
-The INCLUDE folder contains the include files and the library file.
+See "Dynamic_allocation_in_Cowgol.txt" for details related to the use of dynamic allocation functions from Cowgol.
+
+The INCLUDE folder contains the include files and the library file cowgol.coo
 
 The Examples folder contains examples of compilation sessions.
 
