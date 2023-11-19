@@ -1,7 +1,7 @@
 # Cowgol_on_CP_M
 Cowgol, C & assembler development environment hosted on Z80 computers running CP/M
 -------------------------------------------------------------------
-(updated on November 18, 2023)
+(updated on November 19, 2023)
 
 Cowgol is a programming language for very small systems, including Z80 computers ( see https://github.com/davidgiven/cowgol ).
 
@@ -44,6 +44,8 @@ The following executables are needed:
 Also, the library file "cowgol.coo" must be present.
 
 The EXE folder contains the executables.
+
+The runtime environment is provided with a 512 bytes stack, larger than the original 128 bytes stack.
 
 The INCLUDE folder contains the include files and the library file.
 
