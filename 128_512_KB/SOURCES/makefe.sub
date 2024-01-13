@@ -1,0 +1,6 @@
+z80as cowalloc
+z80as -j c1
+z80as -j c2
+z80as -j c3
+z80as -j c4
+z80as -j c5
