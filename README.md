@@ -56,11 +56,11 @@ The Examples folder contains examples of compilation sessions.
 # COWGOL for Z80 computers provided with 128/512 KB RAM
 -------------------------------------------------------
 
-The original version of the compiler failed to compile large cowgol source files.
+The original version of the compiler fails to compile large cowgol source files.
 
-That was caused by the small amount of RAM memory available to the compiler to store the data structures involved in the compilation.
+That is caused by the small amount of RAM memory available to the compiler to store the data structures involved in the compilation.
 
-For sources larger than a few hundred lines, the first step of the compiler issued a fatal error message: "Out of memory".
+For sources larger than a few hundred lines, the first step of the compiler issuess a fatal error message: "Out of memory".
 
 I solved the problem, at least for the z80 computers provided with 128/512 KB RAM.
 
