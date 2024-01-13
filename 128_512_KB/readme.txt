@@ -12,4 +12,6 @@ This is necessary because of the "shadow code", that must be stored to high RAM 
 
 The results are spectacular.
 
-Large COWGOL source files can now be compiled, without any problem 
+Large COWGOL source files can now be compiled, without any problem.
+
+The "error_messages.txt" file contains an index of the error messages issued by the compiler.
