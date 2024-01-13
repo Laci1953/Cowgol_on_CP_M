@@ -1,7 +1,7 @@
 # Cowgol_on_CP_M
 Cowgol, C & assembler development environment hosted on Z80 computers running CP/M
 -------------------------------------------------------------------
-(updated on December 7, 2023)
+(updated on January 13, 2024)
 
 Cowgol is a programming language for very small systems, including Z80 computers ( see https://github.com/davidgiven/cowgol ).
 
@@ -52,5 +52,21 @@ See "Dynamic_allocation_in_Cowgol.txt" for details related to the use of dynamic
 The INCLUDE folder contains the include files and the library file cowgol.coo
 
 The Examples folder contains examples of compilation sessions.
+
+# COWGOL for Z80 computers provided with 128/512 KB RAM
+-------------------------------------------------------
+
+The original version of the compiler failed to compile large cowgol source files.
+
+That was caused by the small amount of RAM memory available to the compiler to store the data structures involved in the compilation.
+
+For sources larger than a few hundred lines, the first step of the compiler issued a fatal error message: "Out of memory".
+
+I solved the problem, at least for the z80 computers provided with 128/512 KB RAM.
+
+I modified the first step of the compiler (COWFE.COM), enabling-it to store part of the data on the "extended" RAM space, beyond the "main" 64KB.
+
+The new compiler is in the 128_512_KB folder.
+
 
 
