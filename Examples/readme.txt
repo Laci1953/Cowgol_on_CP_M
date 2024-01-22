@@ -498,3 +498,7 @@ c>
 5. The Startrek game, ported to Cowgol
 
 It can be compiled only on Z80 machines provided with 128/512 KB RAM
+
+The st.* files are needed at run time.
+
+
