@@ -45,8 +45,6 @@ Also, the library file "cowgol.coo" must be present.
 
 The EXE folder contains the executables.
 
-The runtime environment is provided with a 512 bytes stack, larger than the original 128 bytes stack.
-
 See "Dynamic_allocation_in_Cowgol.txt" for details related to the use of dynamic allocation functions from Cowgol.
 
 The INCLUDE folder contains the include files and the library file cowgol.coo
@@ -67,6 +65,9 @@ I solved the problem, at least for the z80 computers provided with 128/512 KB RA
 I modified the first step of the compiler (COWFE.COM), enabling-it to store part of the data on the "extended" RAM space, beyond the "main" 64KB.
 
 The new compiler is in the 128_512_KB folder.
+
+In the Examples folder, Startrek.cow must be compiled on a Z80 computer provided with 128/512 KB RAM.
+
 
 
 
