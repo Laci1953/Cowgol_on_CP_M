@@ -499,7 +499,7 @@ c>
 
 It can be compiled only on Z80 machines provided with 128/512 KB RAM
 
->cowgol startrek.cow xrnd.as
+>cowgol startrek.cow rand.as
 >
 
 The st.* files are needed at run time.
