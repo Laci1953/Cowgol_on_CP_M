@@ -681,7 +681,7 @@ Your orders are as follows:
  Destroy the 17 Klingon warships which have invaded
  the galaxy before they can attack Federation Headquarters
  on stardate 2630. This gives you 30 days.
- You have -26 starbase(s) in the galaxy for resupplying your ship.
+ You have 2 starbase(s) in the galaxy for resupplying your ship.
 
 Hit any key to accept command.
 Your mission begins with your starship located
