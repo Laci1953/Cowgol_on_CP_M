@@ -502,7 +502,7 @@ var kdata: _klingon[3];		# Klingon Data
 var starbases: int8;		# Starbases in Quadrant
 var base_y: uint8;		# Starbase Location in sector
 var base_x: uint8;
-var starbases_left: int8; 	# Total Starbases
+var starbases_left: int8 := 0; 	# Total Starbases
 var docked: int8;		# Docked flag
 var energy: int16;		# Current Energy
 var energy0: int16;		# Starting Energy
@@ -521,7 +521,7 @@ end sub;
 
 var klingons: int8;		# Klingons in Quadrant
 var total_klingons: int8;	# Klingons at start
-var klingons_left: int8;	# Total Klingons left
+var klingons_left: int8 := 0;	# Total Klingons left
 var torps: int8;		# Photon Torpedoes left
 var torps0: int8;		# Photon Torpedo capacity
 var quad_y: uint8;		# Quadrant Position of Enterprise
