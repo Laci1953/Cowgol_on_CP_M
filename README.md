@@ -68,6 +68,12 @@ The new compiler is in the 128_512_KB folder.
 
 In the Examples folder, Startrek.cow must be compiled on a Z80 computer provided with 128/512 KB RAM.
 
+# New version for 64KB RAM Z80 computers
+----------------------------------------
+
+The modified components (cowfe & cowbe) are now 20% faster.
+
+
 
 
 
