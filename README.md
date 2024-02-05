@@ -1,7 +1,7 @@
 # Cowgol_on_CP_M
 Cowgol, C & assembler development environment hosted on Z80 computers running CP/M
 -------------------------------------------------------------------
-(updated on January 30, 2024)
+(updated on February 5, 2024)
 
 Cowgol is a programming language for very small systems, including Z80 computers ( see https://github.com/davidgiven/cowgol ).
 
@@ -73,6 +73,7 @@ In the Examples folder, Startrek.cow must be compiled on a Z80 computer provided
 
 The modified components (cowfe & cowbe) are now 20% faster.
 
+See 'New version' folder.
 
 
 
