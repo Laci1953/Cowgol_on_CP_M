@@ -5,7 +5,7 @@ The resulting COWGOL toolset can be used on any available 128KB RAM / 512KB RAM 
 -RC2014 provided with SC108, SC114, SC118, SC150, SC152 or the Phillip Stevens memory module, or the 512KB RAM + 512KB ROM module, or
 -RCBUS-based systems provided with SC707, SC714, or
 -Z80ALL (which has 4 x 32KB RAM) or
--Simple80 (2 x 64KB RAM)
+-Simple80 (2 x 64KB RAM) or
 -ROMWBW on 512KB RAM Z80 systems (256 KB RAM available for Cowgol)
 
 For RC2014 or RCBUS 128KB RAM systems, the CP/M must be setup using one of the files from the folder PutSys ( https://github.com/Laci1953/RC2014-CPM/tree/main/PutSys )
