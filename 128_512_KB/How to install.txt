@@ -1,4 +1,6 @@
-Here are the necessary 3 steps, depending on your specific Z80 computer's hardware:
+Here are the necessary steps, depending on your specific Z80 computer's hardware:
+
+For ROMWBW based computers, just copy cowfe for ROMWBW to your disk.
 
 0. For Z80ALL and Simple80, go to step 3.
 
