@@ -15,4 +15,5 @@ The results are spectacular.
 
 Large COWGOL source files can now be compiled, without any problem.
 
-The "error_messages.txt" file contains an index of the error messages issued by the compiler.
+The "error_messages.txt" file contains an index of the error messages issued by the compiler (the compiler will only indicate the index# of the error...).
+
