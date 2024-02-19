@@ -71,7 +71,7 @@ In the Examples folder, Startrek.cow must be compiled on a Z80 computer provided
 # New version for 64KB RAM Z80 computers
 ----------------------------------------
 
-The modified components (cowfe & cowbe) are now 20% faster.
+The modified components (cowfe & cowfix) are now 20% faster.
 
 See 'New version' folder.
 
