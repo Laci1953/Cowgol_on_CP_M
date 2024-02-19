@@ -1,6 +1,6 @@
 This is a new version of the Cowgol compiler, running on all 64KB RAM Z80 computers.
 
-Only cowfe , cowbe and cowfix were modified.
+Only cowfe and cowfix were modified.
 
 They run 20% faster, compared to the old versions.
 
