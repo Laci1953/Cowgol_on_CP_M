@@ -13,7 +13,7 @@ COWGOL [-C] [-Mmapfile] [-Lfile] source1.cow [ source2.cow | source.c | source.a
 
 More than one source file may be specified (with extensions: .cow = cowgol source file, .c = C source file, .as = assembler source file)
 
-The first file must be a Cowgol source file (it contains the "main").
+The first file must be a Cowgol source file.
 
 If more than one Cowgol source files are used, the first one will give the name of the executable being built, but the last one must contain the 'main' code.
 
