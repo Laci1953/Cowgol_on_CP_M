@@ -257,3 +257,6 @@ This is an early functional version of the game, probably there are still bugs t
 
 The main purpose of this experiment was to use the @extern attribute of subroutines, in order to have a large source file divided into several smaller source files, each using the @external mechanism.
 
+It also validated the capability of the tools belonging to the Cowgol toochain.
+
+As a detail: the Z80 assembler source file containing the game, built by the compiler, has 13310 lines and its size is 204 KB.
