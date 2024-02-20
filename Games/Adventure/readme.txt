@@ -259,4 +259,4 @@ The main purpose of this experiment was to use the @extern attribute of subrouti
 
 It also validated the capability of the tools belonging to the Cowgol toochain.
 
-As a detail: the Z80 assembler source file containing the game, built by the compiler, has 13310 lines and its size is 204 KB.
+As a detail ilustrating the size of this project: the Z80 assembler source file containing the game, built by the compiler, has 13310 lines, its size is 204 KB and uses 1700 labels.
