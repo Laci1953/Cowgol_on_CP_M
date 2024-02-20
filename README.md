@@ -15,6 +15,8 @@ More than one source file may be specified (with extensions: .cow = cowgol sourc
 
 The first file must be a Cowgol source file (it contains the "main").
 
+If more than one Cowgol source files are used, the first one will give the name of the executable being built, but the last one must contain the 'main' code.
+
 C and assembler routines may be called from the cowgol source files.
 
 If you want just to compile/assemble the files, the option -C must be used. 
