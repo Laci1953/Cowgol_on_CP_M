@@ -35,7 +35,7 @@ The following executables are needed:
  - COWFE.COM , part of the Cowgol compiler (a modified variant of the original COWFE written by David Given)
  - COWBE.COM , part of the Cowgol compiler (a modified variant of the original COWBE written by David Given)
  - COWLINK.COM , part of the Cowgol compiler (a modified variant of the original COWLINK written by David Given)
- - COWFIX.COM , interface to Z80AS (transforms the COWLINK's output to a syntax accepted by Z80AS)
+ - COWFIX.COM , interface to Z80AS (transforms the COWLINK's output to a syntax accepted by Z80AS and performs code optimizations)
  - Z80AS.COM , the assembler ( see https://github.com/Laci1953/Z80AS )
  - LINK.COM , the HiTech's linker
  - CPP.COM , the HiTech's C pre-processor
