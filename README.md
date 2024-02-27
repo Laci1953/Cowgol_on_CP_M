@@ -49,7 +49,9 @@ The EXE folder contains the executables.
 
 The INCLUDE folder contains the include files and the library file cowgol.coo
 
-The Examples folder contains examples of compilation sessions.
+The GAMES folder contains some old computer games, rewritten in Cowgol.
+
+The EXAMPLES folder contains examples of compilation sessions.
 
 # COWGOL for Z80 computers provided with 128/512 KB RAM
 -------------------------------------------------------
@@ -64,6 +66,5 @@ I solved the problem, at least for the Z80-based computers provided with 128/512
 
 I modified the first step of the compiler (COWFE.COM), enabling-it to store part of the data on the "extended" RAM space, beyond the "main" 64KB.
 
-The new compiler is in the 128_512_KB folder.
+The new compiler components are in the 128_512_KB folder.
 
-In the Examples folder, Startrek.cow must be compiled on a Z80 computer provided with 128/512 KB RAM.
