@@ -45,7 +45,7 @@ The following executables are needed:
 
 Also, the library file "cowgol.coo" must be present.
 
-The EXE folder contains the executables.
+The EXE folder contains the executables (as HEX files, ready to be LOAD-ed).
 
 The INCLUDE folder contains the include files and the library file cowgol.coo
 
