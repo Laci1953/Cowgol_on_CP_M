@@ -47,8 +47,6 @@ Also, the library file "cowgol.coo" must be present.
 
 The EXE folder contains the executables.
 
-See "Dynamic_allocation_in_Cowgol.txt" for details related to the use of dynamic allocation functions from Cowgol.
-
 The INCLUDE folder contains the include files and the library file cowgol.coo
 
 The Examples folder contains examples of compilation sessions.
@@ -70,10 +68,7 @@ The new compiler is in the 128_512_KB folder.
 
 In the Examples folder, Startrek.cow must be compiled on a Z80 computer provided with 128/512 KB RAM.
 
-# New version for 64KB RAM Z80 computers
-----------------------------------------
 
-The modified components (cowfe & cowfix) are now 20% faster.
 
 See 'New version' folder.
 
