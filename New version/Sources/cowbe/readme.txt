@@ -1,1 +1,0 @@
-Optimized version for cowbe
