@@ -67,11 +67,3 @@ I modified the first step of the compiler (COWFE.COM), enabling-it to store part
 The new compiler is in the 128_512_KB folder.
 
 In the Examples folder, Startrek.cow must be compiled on a Z80 computer provided with 128/512 KB RAM.
-
-
-
-See 'New version' folder.
-
-
-
-
