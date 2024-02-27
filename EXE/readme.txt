@@ -4,7 +4,7 @@ You will need also the executables from HiTech's C toolchain.
 
 What is Cowfix?
 
-Cowfix is a tool used to modify and optimize the output of Cowlink.
+Cowfix is a tool I wrote, used to modify and optimize the output of Cowlink.
 
 The original output from Cowlink has some issues that must be addressed, before assembling the file.
 
