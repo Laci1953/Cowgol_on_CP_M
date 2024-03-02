@@ -19,20 +19,92 @@ Examples:
 
 Second, there are some things to be optimized in the original output from cowlink.
 
-It contains a lot of "dead" labels (labels that are not referred in any statement).
+Here is the complete list of the optimizations performed by Cowfix:
 
-Also, there are a lot of useless "ld (ws+nnn),hl" or "ld (ws+nnn),a" statements (the problem is that the data stored is never used...).
+ Non-used labels, dropped.
+------------------------------------------
+ Eliminate 'ld (ws+nnn), hl' or 'ld (ws+nnn), a' statements,
+ if nnn is not used in 'ld hl,(ws+nnn)' statements of the current subroutine, or
+    nnn or nnn+1 is not used in 'ld a,(ws+nnn)' statements of the current subroutine
+------------------------------------------
+When f_xxx is called only with HL or A as parameter,
 
-Also, there are a lot of inefficient fragments of code, type:
-
-	...
-	call	routine
+	call	f_xxx
 	ret
 
-instead of:
+replaced by:
 
+	jp	f_xxx
+------------------------------------------
+ Optimization of jp -> jp -> ... jp -->
+e.g:
+
+	jp	aaa
 	...
-	jp	routine
+aaa:	jp	bbb
+	...
+bbb:	jp	ccc
+	...
+ccc:
 
-Cowfix addresses all these issues, obtaining a smaller and more efficient assembler source file, as output, ready to be assembled.
+replaced by:
+
+	jp	ccc
+	...
+aaa:	jp	ccc
+	...
+bbb:	jp	ccc
+	...
+ccc: 
+-------------------------------------------
+	ld (ws+nnn),hl
+end_fyyy:
+	ld hl,(ws+nnn)
+	ret
+
+replaced by:	ret
+-------------------------------------------
+	ld (ws+nnn),a
+end_fyyy:
+	ld a,(ws+nnn)
+	ret
+
+replaced by:	ret
+---------------------------------
+	jp nz, c01_xxxx
+	jp c01_yyyy
+c01_xxxx:
+
+replaced by:	jp z, c01_yyyy
+---------------------------------
+	jp z, c01_xxxx
+	jp c01_yyyy
+c01_xxxx:
+
+replaced by:	jp nz, c01_yyyy
+---------------------------------
+	jp z, c01_xxxx
+	call fyyy
+c01_xxxx:
+
+replaced by:	call nz,fyyy
+--------------------------------
+	jp nz, c01_xxx
+	call fyyy
+c01_xxx:
+
+replaced by:	call z,fyyy
+--------------------------------
+	jp nz, c01_xxx
+	ret
+c01_xxx:
+
+replaced by:	ret z
+--------------------------------
+	jp z, c01_xxx
+	ret
+c01_xxx:
+
+replaced by:	ret nz
+--------------------------------
 
