@@ -108,3 +108,4 @@ c01_xxx:
 replaced by:	ret nz
 --------------------------------
 
+The source file of Cowfix is included (cowfix.c).
