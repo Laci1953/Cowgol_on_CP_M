@@ -107,5 +107,18 @@ c01_xxx:
 
 replaced by:	ret nz
 --------------------------------
+	jp c01_xxxx 
+	...
+c01_xxxx:
+	ret
 
-The source file of Cowfix is included (cowfix.c).
+replaced by:
+
+	ret 
+	...
+c01_xxxx:
+	ret
+
+--------------------------------
+
+The source file of Cowfix is included (cowfix.c, to be compiled only on 128/512 KB RAM Z80 computers, using https://github.com/Laci1953/HiTech-C-compiler-enhanced)
