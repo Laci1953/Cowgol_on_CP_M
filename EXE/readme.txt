@@ -107,14 +107,14 @@ c01_xxx:
 
 replaced by:	ret nz
 --------------------------------
-	jp c01_xxxx 
+	jp (x,)c01_xxxx 
 	...
 c01_xxxx:
 	ret
 
 replaced by:
 
-	ret 
+	ret (x)
 	...
 c01_xxxx:
 	ret
