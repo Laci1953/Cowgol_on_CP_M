@@ -120,4 +120,5 @@ c01_xxx:
 	ret
 -------------------------------
 
-The source file of Cowfix is included (cowfix.c, to be compiled only on 128/512 KB RAM Z80 computers, using https://github.com/Laci1953/HiTech-C-compiler-enhanced)
+The source files of Cowfix are included (cowfix.c, and fix.as)
+
