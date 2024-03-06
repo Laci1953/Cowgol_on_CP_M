@@ -2,7 +2,9 @@ The executables, belonging to the Cowgol compiler.
 
 You will need also the executables from HiTech's C toolchain.
 
-What is Cowfix?
+Also, the source files for the COWGOL command line processor and for COWFIX are included.
+
+What is COWFIX?
 
 Cowfix is a tool I wrote, used to modify and optimize the output of Cowlink.
 
@@ -18,6 +20,8 @@ Examples:
 -dword nnnnnnnnn is used to store 32 bit constants
 
 Second, there are some things to be optimized in the original output from cowlink.
+
+If the -O option is used in the Cowgol command line, COWFIX will made also code optimizations.
 
 Here is the complete list of the optimizations performed by Cowfix:
 
