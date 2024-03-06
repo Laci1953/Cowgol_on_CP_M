@@ -2,9 +2,10 @@ The Colossal Cave adventure game, ported to the Cowgol language.
 
 The advent1.txt ... advent4.txt files must be present when running the game.
 
-It must be compiled on a 128KB/512KB RAM Z80 machine.
+It must be compiled on a 128KB/512KB RAM Z80 machine, using the -O option 
+(otherwise the Z80AS will fail to assemble the resulting assembler file, which is huge - ~ 20000 lines).
 
-D>cowgol advent.cow advmain.cow xrnd.as
+D>cowgol -o advent.cow advmain.cow xrnd.as
 COWGOL COMPILER (CP/M-80) V2.0
 Copyright (C) David Given
 ADVENT.COW
