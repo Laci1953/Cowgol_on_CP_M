@@ -1,7 +1,7 @@
 # Cowgol_on_CP_M
 Cowgol, C & assembler development environment hosted on Z80 computers running CP/M
 -------------------------------------------------------------------
-(updated on March 3, 2024)
+(updated on March 6, 2024)
 
 Cowgol is a programming language for very small systems, including Z80 computers ( see https://github.com/davidgiven/cowgol ).
 
@@ -9,7 +9,7 @@ You will find here a complete Cowgol development environment, hosted on CP/M, fo
 
 To compile Cowgol source files (and, optionally, C and assembler files), or to build an executable starting from Cowgol source files (and, optionally, C & assembler files), the following command is used:
 
-COWGOL [-C] [-Mmapfile] [-Lfile] source1.cow [ source2.cow | source.c | source.as ] ...
+COWGOL [-C] [-Mmapfile] [-Lfile] [-O] source1.cow [ source2.cow | source.c | source.as ] ...
 
 More than one source file may be specified (with extensions: .cow = cowgol source file, .c = C source file, .as = assembler source file)
 
@@ -26,6 +26,9 @@ If the option -C is not specified, the files will be first compiled/assembled, t
 The option -M builds a memory map for the executable.
 
 The option -Lfile adds the file "libfile.lib" to the link list.
+
+The option -O instructs COWFIX to perform various code optimizations in the file that will be assembled by Z80AS. 
+This may help also in case of big Cowgol programs, by letting COWFIX to comment-out unused labels and allowing Z80AS to process very large source files.
 
 HiTech's LINK is used to link the object files.
 
