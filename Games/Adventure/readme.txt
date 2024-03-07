@@ -182,7 +182,7 @@ Copying from input file: ADVMAIN.COO
 done: 24kB free
 ERA ADVENT.COO
 ERA ADVMAIN.COO
-0:COWFIX $CTMP1.$$$ $CTMP2.$$$
+0:COWFIX $CTMP1.$$$ $CTMP2.$$$ -O
 0:Z80AS -J -N -OADVENT.OBJ $CTMP2.$$$
 Z80AS Macro-Assembler V4.8
 
