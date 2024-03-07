@@ -48,7 +48,7 @@ The following executables are needed:
 
 Also, the library file "cowgol.coo" must be present.
 
-The EXE folder contains the executables (as HEX files, ready to be LOAD-ed).
+The EXE folder contains the executables (as HEX files, ready to be LOAD-ed) and the source files for Cowgol command line processor (cowgol.c) and for Cowfix(cowfix.c and fix.as).
 
 The INCLUDE folder contains the include files and the library file cowgol.coo
 
