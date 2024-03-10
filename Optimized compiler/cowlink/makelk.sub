@@ -1,0 +1,4 @@
+z80as -j cowlink
+xsub
+link
+-ptext=100h -c100h -ocowlinko.com cowlinko.obj 
