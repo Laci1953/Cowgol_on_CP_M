@@ -1,0 +1,7 @@
+z80as -j cowbeo1a
+z80as -j cowbeo1b
+z80as -j cowbeo2a
+z80as -j cowbeo2b
+xsub
+link
+-ptext=100h -c100h -ocowbeo.com cowbeo1a.obj cowbeo1b.obj cowbeo2a.obj cowbeo2b.obj
