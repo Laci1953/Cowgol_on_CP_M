@@ -75,4 +75,9 @@ The new compiler components are in the 128_512_KB folder.
 
 All the games from the GAMES folder need to be compiled using this enhanced version of the Cowgol compiler, on a 128/512 KB RAM Z80 computer.
 
+# Optimized version of Cowgol compiler
+--------------------------------------
 
+Cowfe, Cowbe and Cowlink were optimized.
+See folder "Optimized compiler"
+For each ot these components, the source files, the executable (HEX) and the makefile are included.
