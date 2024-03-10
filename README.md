@@ -79,5 +79,7 @@ All the games from the GAMES folder need to be compiled using this enhanced vers
 --------------------------------------
 
 Cowfe, Cowbe and Cowlink were optimized.
+
 See folder "Optimized compiler"
+
 For each ot these components, the source files, the executable (HEX) and the makefile are included.
