@@ -89,4 +89,5 @@ For each ot these components, the source files, the executable (HEX) and the mak
 
 You may find a lot of interesting Cowgol programs here: https://rosettacode.org/wiki/Category:Cowgol
 
+Select one of the 164 programs, then select on the left panel the Cowgol language, and you will see the source code of the program.
 
