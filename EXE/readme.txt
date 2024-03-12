@@ -1,6 +1,6 @@
-The executables, belonging to the Cowgol compiler.
+The executables, belonging to the Cowgol compiler (COWGOL, COWFE, COWBE, COWLINK, COWFIX).
 
-The executables from HiTech's C toolchain are also included.
+The executables from HiTech's C toolchain are also included ($EXEC, CPP, P1, CGEN, OPTIM, Z80AS, LINK).
 
 Also, the source files for the COWGOL command line processor and for COWFIX are included.
 
