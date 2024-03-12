@@ -1,6 +1,6 @@
 The executables, belonging to the Cowgol compiler.
 
-You will need also the executables from HiTech's C toolchain.
+The executables from HiTech's C toolchain are also included.
 
 Also, the source files for the COWGOL command line processor and for COWFIX are included.
 
