@@ -39,10 +39,10 @@ The following executables are needed:
  - COWGOL.COM (a modified variant of the HiTech's C.COM), the component that interprets the command line and feeds into $EXEC run requests for the subsequent executables from the Cowgol toolchain
  - COWFE.COM , the "cowgol front end", who parses the source file, part of the Cowgol compiler 
  - COWBE.COM , the "cowgol back end", who builds the "cowgol object file", part of the Cowgol compiler 
- - COWLINK.COM , the "cowgol linker", who binds all the "cowgol object file" and outputs a Z80 assembler file, part of the Cowgol compiler
+ - COWLINK.COM , the "cowgol linker", who binds all the "cowgol object files" and outputs a Z80 assembler file, part of the Cowgol compiler
  - COWFIX.COM , interface to Z80AS , who transforms the Cowlink output to a syntax accepted by Z80AS and performs code optimizations
- - Z80AS.COM , the assembler, who assembles the output of Cowfix ( see https://github.com/Laci1953/Z80AS )
- - LINK.COM , the HiTech's linker, who builds the final executable
+ - Z80AS.COM ( see https://github.com/Laci1953/Z80AS ), the assembler, who assembles the output of Cowfix and any assembler file included in the command line, producing HiTech compatible object files
+ - LINK.COM , the HiTech's linker, who builds the final executable, using as input the object files and, if requested, the library file and producing the final executable
  - CPP.COM , the HiTech's C pre-processor (needed only when C source files will be compiled)
  - P1.COM , the HiTech's C compiler pass 1 (needed only when C source files will be compiled)
  - CGEN.COM , the HiTech's C compiler pass 2 (needed only when C source files will be compiled)
