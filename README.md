@@ -27,12 +27,12 @@ If the option -C is not specified, the files will be first compiled/assembled, t
 
 The option -Mmapfile builds a memory map for the executable.
 
-The option -Lfile adds the file "libfile.lib" to the link list.
+The option -Lfile adds the file "libfile.lib" to the list of files used as input by the LINK linker.
 
 The option -O instructs COWFIX to perform various code optimizations in the file that will be assembled by Z80AS. 
 This may help also in case of big Cowgol programs, by letting COWFIX to comment-out unused labels and allowing Z80AS to process very large source files.
 
-HiTech's LINK is used to link the object files.
+HiTech's LINK is used to link the object files and build the final executable.
 
 The following executables are needed:
  - $EXEC.COM , the "batch processor" from the HiTech's C compiler, who launches all the subsequent executables from the Cowgol toolchain
