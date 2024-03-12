@@ -11,7 +11,7 @@ You will find here a complete Cowgol development environment, hosted on CP/M, fo
 
 To compile Cowgol source files (and, optionally, C and assembler files), or to build an executable starting from Cowgol source files (and, optionally, C & assembler files), the following command is used:
 
-COWGOL [-C] [-Mmapfile] [-Lfile] [-O] source1.cow [ source2.cow | source.c | source.as ] ...
+>COWGOL [-C] [-Mmapfile] [-Lfile] [-O] source1.cow [ source2.cow | source.c | source.as ] ...
 
 More than one source file may be specified (with extensions: .cow = cowgol source file, .c = C source file, .as = assembler source file)
 
