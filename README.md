@@ -83,3 +83,10 @@ Cowfe, Cowbe and Cowlink were optimized.
 See folder "Optimized compiler"
 
 For each ot these components, the source files, the executable (HEX) and the makefile are included.
+
+# Examples of Cowgol programs
+-----------------------------
+
+You may find a lot of interesting Cowgol programs here: https://rosettacode.org/wiki/Category:Cowgol
+
+
