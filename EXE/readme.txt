@@ -8,7 +8,9 @@ What is COWFIX?
 
 Cowfix is a tool I wrote, used to modify and optimize the output of Cowlink.
 
-The original output from Cowlink has some issues that must be addressed, before assembling the file.
+Cowlink is the "linker" that binds the "cowgol object code" files produced by Cowbe, into a Z80 assembler file.
+
+The original output from Cowlink has however some issues that must be addressed, before assembling the file.
 
 First, the file contains some "exotic" Z80 assembler syntax, which must be corrected.
 
