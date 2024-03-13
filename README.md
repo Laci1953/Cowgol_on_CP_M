@@ -63,7 +63,7 @@ The EXAMPLES folder contains examples of compilation sessions.
 
 The COWFE, COWBE and COWLINK contained in the EXE folder are optimized versions of the originals.
 
-You may find in the "Optimized compiler" folder the modified source files of these executables.
+You may find in the "Optimized compiler" folder the modified assembler source files of these executables.
 
 In the source files, you will notice a lot of comments (lines containing ";" )
 
