@@ -43,14 +43,14 @@ The following executables are needed:
  - COWFIX.COM , interface to Z80AS , who transforms the Cowlink output to a syntax accepted by Z80AS and performs code optimizations
  - Z80AS.COM ( see https://github.com/Laci1953/Z80AS ), the assembler, who assembles the output of Cowfix and any assembler file included in the command line, producing HiTech compatible object files
  - LINK.COM , the HiTech's linker, who builds the final executable, using as input the object files and, if requested, the library file and producing the final executable
- - CPP.COM , the HiTech's C pre-processor (needed only when C source files will be compiled)
+ - CPP.COM , the HiTech's C pre-processor (needed only when C source files will be compiled), modified to accept // - style comments
  - P1.COM , the HiTech's C compiler pass 1 (needed only when C source files will be compiled)
  - CGEN.COM , the HiTech's C compiler pass 2 (needed only when C source files will be compiled)
  - OPTIM.COM , the HiTech's C compiler optimizer (needed only when C source files will be compiled)
 
 Also, the library file "cowgol.coo" must be present.
 
-The EXE folder contains the executables (as HEX files, ready to be LOAD-ed) and the source files for the Cowgol command line processor (cowgol.c) and for Cowfix(cowfix.c and fix.as).
+The EXE folder contains the all the needed executables (as HEX files, ready to be LOAD-ed) and the source files for the Cowgol command line processor (cowgol.c) and for Cowfix(cowfix.c and fix.as).
 
 The INCLUDE folder contains the include files and the library file cowgol.coo
 
