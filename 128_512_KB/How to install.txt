@@ -36,13 +36,14 @@ This step is mandatory for all computers.
 
 To implement on your computer the enhanced Cowgol compiler, you need to copy the appropriate .HEX file (according to your hardware):
 
-*cowfe_128.HEX = for SC108 & compatibles
-*cowfe_512.HEX = for 512KB RAM systems
-*cowfe_Z80ALL.HEX = for Z80ALL
-*cowfe_romwbw.HEX = for ROMWBW based computers
-, then execute ( using the "generic" names ):
+* cowfe_128.HEX = for SC108 & compatibles
+* cowfe_512.HEX = for 512KB RAM systems
+* cowfe_Z80ALL.HEX = for Z80ALL
+* cowfe_romwbw.HEX = for ROMWBW based computers
 
-LOAD cowfe_*
+, renaming-it "cowfe.hex", then execute:
+
+LOAD cowfe
 
 Now, you have the enhanced COWGOL installed.
 
