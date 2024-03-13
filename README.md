@@ -3,15 +3,15 @@ Cowgol, C & assembler development environment hosted on Z80 computers running CP
 -------------------------------------------------------------------
 (updated on March 13, 2024)
 
+You will find here a complete Cowgol development environment, hosted on CP/M, for Z80 computers.
+
 Cowgol is a programming language for very small systems, including Z80 computers ( see https://github.com/davidgiven/cowgol ).
 
 A small Cowgol programming language manual is included.
 
-You will find here a complete Cowgol development environment, hosted on CP/M, for Z80 computers.
-
 To compile Cowgol source files (and, optionally, C and assembler files), or to build an executable starting from Cowgol source files (and, optionally, C & assembler files), the following command is used:
 
-     >COWGOL [-C] [-Mmapfile] [-Lfile] [-O] source1.cow [ source2.cow | source.c | source.as ] ...
+COWGOL [-C] [-Mmapfile] [-Lfile] [-O] source1.cow [ source2.cow | source.c | source.as ] ...
 
 More than one source file may be specified (with extensions: .cow = cowgol source file, .c = C source file, .as = assembler source file)
 
