@@ -1,5 +1,7 @@
 Here you will find an enhanced COWGOL compiler, to be used on Z80 computers provided with 128/512 KB RAM, able to compile larger COWGOL source files, compared with the original version of the compiler.
 
+Only the Cowfe executable was modified.
+
 The resulting COWGOL toolset can be used on any available 128KB RAM / 512KB RAM Z80 hardware system configuration:
 
 -RC2014 provided with SC108, SC114, SC118, SC150, SC152 or the Phillip Stevens memory module, or the 512KB RAM + 512KB ROM module, or
