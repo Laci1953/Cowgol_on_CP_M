@@ -173,7 +173,7 @@ The gain is significant:
 
 - 10 to 20% faster
 
-This optimized version runs on all 64KB RAM Z80 computers.
+This optimized version of Cowgol compiler runs on all 64KB RAM Z80 computers.
 
 # COWGOL for Z80 computers provided with 128/512 KB RAM
 -------------------------------------------------------
