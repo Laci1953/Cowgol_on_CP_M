@@ -1,8 +1,8 @@
-Here you will find an optimized version of the Cowgol compiler.
+Here you will find the source code of the optimized version of the Cowgol compiler.
 
 Cowfe, Cowbe and Cowlink were optimized.
 
-For each ot these components, the source files, the executable (HEX) and the makefile are included.
+For each ot these components, the source files and the makefile are included.
 
 In the source files, you will notice a lot of comments (lines containing ";" )
 These are inserted by Cowfix to show what changes he made to the original source file.
