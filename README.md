@@ -106,7 +106,8 @@ means that the lines
 were substituted by the line "jp   f7_print_char"
 
 3.
-	jp nz, c01_0014 ; c01_001f
+
+        jp nz, c01_0014 ; c01_001f
 
 ...
 
@@ -127,7 +128,8 @@ c01_001f:
 was solved by inserting the correct final jump address " jp nz, c01_0014"
 
 4.
-	call f11_UIToA
+
+        call f11_UIToA
 
 ;	ld (ws+1450), hl
 
@@ -136,7 +138,8 @@ was solved by inserting the correct final jump address " jp nz, c01_0014"
 means that the two "ld" instructions were "commented out", because the addresses ws+1450 and ws+1452 are never accessed for read.
 
 5.
-  ...
+
+        ...
 
         sbc hl,de
 
@@ -151,14 +154,16 @@ means that the two "ld" instructions were "commented out", because the addresses
 means that the two "ld" were commented out, they are useless, because the routine just wants to return HL...
 
 6.
-  ...
+
+         ...
 
          jp nc, c01_00c3
 
 ;c01_00c2:
 
          ld de,4
-  ...
+
+         ...
 
 means that "c01_00c2" was commented out, because it's a "dead" label (no jumps or calls are directed to this label)
 
