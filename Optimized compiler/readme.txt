@@ -2,6 +2,8 @@ Here you will find the source code of the optimized version of the Cowgol compil
 
 Cowfe, Cowbe and Cowlink were optimized.
 
+The executables are stored in the EXE folder.
+
 For each ot these components, the source files and the makefile are included.
 
 In the source files, you will notice a lot of comments (lines containing ";" )
