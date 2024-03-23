@@ -218,7 +218,5 @@ I just renamed some files, to be compatible with the CP/M file name standards, a
 
 The COWFE, COWBE and COWLINK executables that I used were customized to allocate some of the objects in the extended RAM memory space, making thus possible the compiling by avoiding the "out-of-memory" error.
 
-Here is the log of compiling Cowfe, Cowbe and Cowlink.
-
 I did not included in this log the assembling and producing(linking) the final executables, but I tested the resulting executables (I compiled & run Hexdump...) and they work as designed.
 
