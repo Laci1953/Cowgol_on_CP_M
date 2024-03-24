@@ -216,6 +216,8 @@ The Cowfe, Cowbe and Cowlink source files were taken from the output of a Cowgol
 
 These are huge programs; as an example, the Cowfe assembler file that was built as the output of compiling Cowfe, has around 20000 lines of code.
 
+See the folder "Compiling_the_compiler" for the compiler's source code.
+
 I just renamed some files, to be compatible with the CP/M file name standards, and to avoid duplicates ( e.g. "types.coh" ).
 
 The COWFE, COWBE and COWLINK executables that I used were customized to allocate some of the objects in the extended RAM memory space, making thus possible the compiling by avoiding the "out-of-memory" error.
