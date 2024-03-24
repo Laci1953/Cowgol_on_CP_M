@@ -4,3 +4,4 @@ The source code of the compiler components is here.
 
 Also, the logs documenting the compiler's compiling are published here.
 
+The compiling was done on a RC2014 512KB Z80 computer, using a customized Cowgol compiler.
