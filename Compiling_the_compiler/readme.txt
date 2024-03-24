@@ -8,3 +8,5 @@ The compiling was done on a RC2014 512KB Z80 computer, using a customized Cowgol
 
 These customized executables are included here.
 
+To use these customized Cowgol executables, you will need a 512KB RAM Z80 computer running plain CP/M ( NOT ROMWBW ).
+
