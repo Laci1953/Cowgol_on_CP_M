@@ -1,0 +1,106 @@
+include "cowgol.coh";
+include "argv.coh";
+include "strings.coh";
+include "malloc.coh";
+include "file.coh";
+
+typedef string is [uint8];
+typedef Size is uint16;
+
+include "lcoodecl.coh";
+include "ltypes.coh";
+include "utils.coh";
+include "lemitter.coh";
+include "archlink.coh";
+include "cooread.coh";
+include "streams.coh";
+include "asmwrite.coh";
+include "graph.coh";
+
+print("COWLINK: ");
+print_i16((GetFreeMemory() >> 10) as uint16);
+print("kB free\n");
+
+var coos: [Coo] := 0 as [Coo];
+var firstCoo: [Coo] := 0 as [Coo];
+var outputFilename: [uint8] := 0 as [uint8];
+var mainSubroutine: [Subroutine] := 0 as [Subroutine];
+var mostRecentSubroutine: [Subroutine] := 0 as [Subroutine];
+
+sub SyntaxError() is
+	SimpleError("Syntax error\n");
+end sub;
+
+sub AddInputFile(filename: [uint8]) is
+	print("Adding input file: ");
+	print(filename);
+	print_nl();
+
+	var coo := OpenAndLoadCoo(filename);
+	if firstCoo == (0 as [Coo]) then
+		firstCoo := coo;
+		coos := coo;
+	else
+		coos.next := coo;
+		coos := coo;
+	end if;
+
+	var thisMain := [FindSub(coo, 0)];
+	if thisMain != (0 as [Subroutine]) then
+		if mainSubroutine == (0 as [Subroutine]) then
+			mainSubroutine := thisMain;
+		end if;
+	end if;
+	if mostRecentSubroutine != (0 as [Subroutine]) then
+		AddRef(mostRecentSubroutine, thisMain);
+	end if;
+	mostRecentSubroutine := thisMain;
+end sub;
+
+ArgvInit();
+loop
+	var arg := ArgvNext();
+	if arg == (0 as [uint8]) then
+		break;
+	end if;
+
+	if (StrICmp(arg, "-o") == 0) then
+		outputFilename := ArgvNext();
+	elseif [arg] == '-' then
+		SyntaxError();
+	else
+		AddInputFile(arg);
+	end if;
+end loop;
+
+if mainSubroutine == 0 as [Subroutine] then
+	SimpleError("No main subroutine in any coofile");
+end if;
+if outputFilename == 0 as [uint8] then
+	SimpleError("No output filename specified");
+end if;
+
+print("Analysing...\n");
+ResolveExternals();
+PlaceSubroutines(mainSubroutine);
+
+EmitterOpenfile(outputFilename);
+
+print("Creating output file: ");
+print(outputFilename);
+print_nl();
+InitStreams();
+SetStream(7);
+ArchEmitHeader(firstCoo);
+FlushStream();
+WriteAllSubroutinesToOutputFile(firstCoo);
+SetStream(7);
+ArchEmitFooter(firstCoo);
+FlushStream();
+
+EmitterClosefile();
+
+print("done: ");
+print_i16((GetFreeMemory() >> 10) as uint16);
+print("kB free\n");
+

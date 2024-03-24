@@ -1,0 +1,156 @@
+var current_coo_id: uint8 := 1;
+
+sub read_bin1(fcb: [FCB]): (c: uint8) is
+	c := FCBGetChar(fcb);
+end sub;
+
+sub read_bin2(fcb: [FCB]): (val: uint16) is
+	val := read_bin1(fcb) as uint16;
+	val := val | ((read_bin1(fcb) as uint16) << 8);
+end sub;
+
+sub read_string(fcb: [FCB], len: uint8): (ptr: [uint8]) is
+	ptr := Alloc((len+1) as intptr) as [uint8];
+	var p := ptr;
+	loop
+		if len == 0 then
+			break;
+		end if;
+		[p] := read_bin1(fcb);
+		p := p + 1;
+		len := len - 1;
+	end loop;
+end sub;
+
+sub AddRef(subr: [Subroutine], calls: [Subroutine]) is
+	var refid := subr.numRefs;
+	subr.numRefs := refid + 1;
+
+	var ref := &subr.refs;
+	while refid >= COO_REFS_SIZE loop
+		if ref.next == (0 as [References]) then
+			ref.next := Alloc(@bytesof References) as [References];
+		end if;
+		ref := ref.next;
+		refid := refid - COO_REFS_SIZE;
+	end loop;
+
+	ref.calls[refid as uint8] := calls;
+end sub;
+
+sub FindSub(coo: [Coo], id: uint16): (ptr: [[Subroutine]]) is
+	var subindex := &coo.index;
+	while id >= COO_INDEX_SIZE loop
+		if subindex.next == (0 as [CooIndex]) then
+			subindex.next := Alloc(@bytesof CooIndex) as [CooIndex];
+		end if;
+		subindex := subindex.next;
+		id := id - COO_INDEX_SIZE;
+	end loop;
+
+	ptr := &subindex.subroutines[id as uint8];
+end sub;
+
+sub FindOrCreateSub(coo: [Coo], id: uint16): (subroutine: [Subroutine]) is
+	var ptr := FindSub(coo, id);
+	subroutine := [ptr];
+	if subroutine == (0 as [Subroutine]) then
+		subroutine := Alloc(@bytesof Subroutine) as [Subroutine];
+		subroutine.coo := coo;
+		subroutine.next := subroutines;
+		subroutines := subroutine;
+		subroutine.id := current_id;
+		[ptr] := subroutine;
+		current_id := current_id + 1;
+	end if;
+end sub;
+
+sub Deref(subin: [Subroutine]): (subout: [Subroutine]) is
+	subout := subin;
+	if subin != (0 as [Subroutine]) then
+		var external := subin.external;
+		if external != (0 as [External]) then
+			subout := external.impl;
+		end if;
+	end if;
+end sub;
+
+sub FindOrCreateExternal(name: string): (external: [External]) is
+	external := externals;
+	while external != (0 as [External]) loop
+		if StrCmp(external.name, name) == 0 then
+			return;
+		end if;
+		external := external.next;
+	end loop;
+
+	external := Alloc(@bytesof External) as [External];
+	external.next := externals;
+	external.name := StrDup(name);
+	externals := external;
+end sub;
+
+sub OpenAndLoadCoo(filename: [uint8]): (coo: [Coo]) is
+	coo := Alloc(@bytesof Coo) as [Coo];
+	coo.id := current_id;
+	coo.name := filename;
+	current_id := current_id + 1;
+	if FCBOpenIn(&coo.fcb, filename) != 0 then
+		CannotOpen(filename);
+	end if;
+
+	var streamid: uint8;
+	var id: uint16;
+	var pos: uint32 := 0;
+	loop
+		FCBSeek(&coo.fcb, pos);
+		var c := read_bin1(&coo.fcb);
+		var len := read_bin2(&coo.fcb);
+		var subroutine: [Subroutine];
+		if c == 'E' then
+			break;
+		elseif c == 'F' then
+			streamid := read_bin1(&coo.fcb);
+			id := read_bin2(&coo.fcb);
+			subroutine := FindOrCreateSub(coo, id);
+			subroutine.state := subroutine.state | SUB_IMPLEMENTATION;
+		elseif c == 'R' then
+			var subrid := read_bin2(&coo.fcb);
+			var requiresid := read_bin2(&coo.fcb);
+			AddRef(FindOrCreateSub(coo, subrid), FindOrCreateSub(coo, requiresid));
+		elseif c == 'W' then
+			id := read_bin2(&coo.fcb);
+			subroutine := FindOrCreateSub(coo, id);
+			var wid := read_bin1(&coo.fcb);
+			subroutine.workspaceSize[wid] := read_bin2(&coo.fcb);
+		elseif c == 'N' then
+			id := read_bin2(&coo.fcb);
+			subroutine := FindOrCreateSub(coo, id);
+			subroutine.name := read_string(&coo.fcb, (len as uint8) - 2);
+		elseif c == 'X' then
+			id := read_bin2(&coo.fcb);
+			subroutine := FindOrCreateSub(coo, id);
+			var name := read_string(&coo.fcb, (len as uint8) - 2);
+			var external := FindOrCreateExternal(name);
+			if subroutine.external != (0 as [External]) then
+				StartError();
+				print("multiple external declarations of '");
+				print(name);
+				print("'");
+				EndError();
+			end if;
+			subroutine.external := external;
+		else
+			print("error: unsupported record '");
+			print_char(c);
+			print("' in ");
+			print(filename);
+			print(" at ");
+			print_hex_i32(pos);
+			print_nl();
+			ExitWithError();
+		end if;
+		pos := pos + (len as uint32) + 3;
+	end loop;
+end sub;
+

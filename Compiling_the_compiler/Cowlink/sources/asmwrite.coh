@@ -1,0 +1,76 @@
+sub WriteSubroutinesToOutputFile(coo: [Coo]) is
+	var id: uint16;
+	var c: uint8;
+	var length: Size;
+
+	sub MalformedError(s: [uint8]) is
+		print("error: malformed coofile: ");
+		print(s);
+		print_nl();
+		ExitWithError();
+	end sub;
+
+	sub UnexpectedEndOfChunk() is
+		MalformedError("unexpected end of chunk");
+	end sub;
+
+	sub ReadB1(): (result: uint8) is
+		if length < 1 then
+			UnexpectedEndOfChunk();
+		end if;
+		length := length - 1;
+		result := read_bin1(&coo.fcb);
+	end sub;
+
+	sub ReadB2(): (result: uint16) is
+		if length < 2 then
+			UnexpectedEndOfChunk();
+		end if;
+		length := length - 2;
+		result := read_bin2(&coo.fcb);
+	end sub;
+
+	sub CopySourceChunk() is
+		while length != 0 loop
+			c := ReadB1();
+			WriteStream(c);
+		end loop;
+	end sub;
+
+	var sid: uint8;
+	var pos: uint32 := 0;
+	loop
+		length := 255; # no length limit here
+		FCBSeek(&coo.fcb, pos);
+		c := ReadB1();
+		length := ReadB2();
+		pos := pos + (length as uint32) + 3;
+
+		if c == 'E' then
+			break;
+		elseif c == 'F' then
+			sid := ReadB1();
+			id := ReadB2();
+			current_subroutine := FindOrCreateSub(coo, id);
+			current_subroutine := Deref(current_subroutine);
+			if (current_subroutine.state & SUB_USED) != 0 then
+				SetStream(sid & 0x7f);
+				CopySourceChunk();
+				if (sid & 0x80) != 0 then
+					FlushStream();
+				end if;
+			end if;
+		end if;
+	end loop;
+end sub;
+
+sub WriteAllSubroutinesToOutputFile(coos: [Coo]) is
+	while coos != (0 as [Coo]) loop
+		print("Copying from input file: ");
+		print(coos.name);
+		print_nl();
+		WriteSubroutinesToOutputFile(coos);
+		coos := coos.next;
+	end loop;
+end sub;
+

@@ -1,0 +1,7 @@
+cowlinkn cowgol.coo hexdump.coo -o tmp.as
+cowfix tmp.as ok.as -o
+z80as -j ok
+xsub
+link
+-ptext=100h,data,bss -c100h -ohexdump.com ok.obj
+hexdump hexdump.cow
