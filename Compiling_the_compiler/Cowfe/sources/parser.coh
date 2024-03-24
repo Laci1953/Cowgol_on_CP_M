@@ -1,0 +1,2880 @@
+# %include sections from the grammar
+#line 117 "src/cowfe/parser.y"
+
+	sub BeginNormalLoop(): (ll: [LoopLabels]) is
+		ll := InternalAlloc(@bytesof LoopLabels) as [LoopLabels];
+		ll.loop_label := AllocLabel();
+		ll.exit_label := AllocLabel();
+		ll.old_break_label := break_label;
+		ll.old_continue_label := continue_label;
+		break_label := ll.exit_label;
+		continue_label := ll.loop_label;
+	end sub;
+
+	sub TerminateNormalLoop(ll: [LoopLabels]) is
+		Generate(MidJump(continue_label));
+		Generate(MidLabel(break_label));
+		break_label := ll.old_break_label;
+		continue_label := ll.old_continue_label;
+		Free(ll as [uint8]);
+	end sub;
+#line 318 "src/cowfe/parser.y"
+
+	sub Negate(node: [Node]) is
+		node.beq.negated := node.beq.negated ^ 1;
+	end sub;
+#line 341 "src/cowfe/parser.y"
+
+	sub ConditionalEq(lhs: [Node], rhs: [Node], negated: uint8): (result: [Node]) is
+		CondSimple(lhs, rhs);
+		var truelabel := AllocLabel();
+		var falselabel := AllocLabel();
+		var w := NodeWidth(lhs);
+
+		result := MidBeq(w, lhs, rhs, truelabel, falselabel, 0, negated);
+	end sub;
+
+	sub ConditionalLt(lhs: [Node], rhs: [Node], negated: uint8): (result: [Node]) is
+		CondSimple(lhs, rhs);
+		var truelabel := AllocLabel();
+		var falselabel := AllocLabel();
+		var w := NodeWidth(lhs);
+
+		if IsSNum(lhs.type) != 0 then
+			result := MidBlts(w, lhs, rhs, truelabel, falselabel, 0, negated);
+		else
+			result := MidBltu(w, lhs, rhs, truelabel, falselabel, 0, negated);
+		end if;
+	end sub;
+#line 448 "src/cowfe/parser.y"
+
+	sub parser_i_bad_next_prev() is
+		SimpleError("@next and @prev only work on pointers");
+	end sub;
+#line 626 "src/cowfe/parser.y"
+
+	sub parser_i_constant_error() is
+		SimpleError("only constant values are allowed here");
+	end sub;
+#line 775 "src/cowfe/parser.y"
+
+	sub i_check_sub_call_args() is
+		var subr := current_call.intfsubr;
+		if current_call.num_input_args != subr.num_input_parameters then
+			StartError();
+			print("subroutine ");
+			print(subr.symbol.name);
+			print(" takes ");
+			print_i8(subr.num_input_parameters);
+			print(" but was given ");
+			print_i8(current_call.num_input_args);
+			EndError();
+		end if;
+	end sub;
+
+	sub i_end_call() is
+		EmitterReferenceSubroutine(current_subr, current_call.intfsubr);
+		var call := current_call;
+		current_call := call.parent;
+		Free(call as [uint8]);
+	end sub;
+#line 985 "src/cowfe/parser.y"
+
+	var preparing_subr: [Subroutine];
+#line 1186 "src/cowfe/parser.y"
+
+	sub SymbolRedeclarationError() is
+		StartError();
+		print("attempt to redefine ");
+		print(current_type.symbol.name);
+		EndError();
+	end sub;
+#line 1276 "src/cowfe/parser.y"
+
+	var current_member: [Symbol];    # for records only
+	var current_offset: Size;        # within the current braced element
+	var current_global_offset: Size; # overall
+
+	record NestedTypeInit is
+		old_current_type: [Type];
+		old_current_member: [Symbol];
+		old_current_offset: Size;
+	end record;
+
+	sub WrongNumberOfElementsError() is
+		StartError();
+		print("wrong number of elements in initialiser for ");
+		print(current_type.symbol.name);
+		EndError();
+	end sub;
+
+	sub CheckEndOfInitialiser() is
+		if IsArray(current_type) != 0 then
+			var memberwidth := current_type.arraytype.element.stride;
+			current_offset := ArchAlignUp(current_offset, current_type.arraytype.element.alignment);
+			if current_type.width == 0 then
+				current_type.width := current_offset;
+				var size := current_offset / memberwidth;
+				current_type.arraytype.size := size;
+				current_type.arraytype.indextype := ArchGuessIntType(0, (size-1) as Arith);
+			end if;
+			if current_offset != current_type.width then
+				WrongNumberOfElementsError();
+			end if;
+		else
+			if current_member != (0 as [Symbol]) then
+				WrongNumberOfElementsError();
+			end if;
+		end if;
+	end sub;
+
+	sub GetInitedMember(): (member: [Symbol], type: [Type]) is
+		member := 0 as [Symbol];
+
+		if IsArray(current_type) != 0 then
+			type := current_type.arraytype.element;
+		else
+			if current_member == (0 as [Symbol]) then
+				type := 0 as [Type];
+				return;
+			end if;
+
+			member := current_member;
+			type := current_member.vardata.type;
+			current_member := current_member.next;
+		end if;
+	end sub;
+
+	sub AlignTo(alignment: uint8) is
+		var newoffset := ArchAlignUp(current_global_offset, alignment);
+		while current_global_offset != newoffset loop
+			Generate(MidInit(1, 0));
+			current_offset := current_offset + 1;
+			current_global_offset := current_global_offset + 1;
+		end loop;
+	end sub;
+
+	sub CheckForOverlaps(member: [Symbol]) is
+		# Not for arrays.
+		if member == (0 as [Symbol]) then
+			return;
+		end if;
+
+		if member.vardata.offset < current_offset then
+			SimpleError("out of order static initialisation");
+		end if;
+	end sub;
+
+	sub GetInitedMemberChecked(): (member: [Symbol], type: [Type]) is
+		(member, type) := GetInitedMember();
+		if type == (0 as [Type]) then
+			WrongNumberOfElementsError();
+		end if;
+
+		AlignTo(type.alignment);
+		CheckForOverlaps(member);
+	end sub;
+#line 178 ".obj/src/cowfe+parser/parser.coh"
+
+# makeheaders token definitions
+
+# control settings
+typedef YYCODETYPE is uint8;
+const YYNOCODE := 124;
+typedef YYACTIONTYPE is uint16;
+typedef ParseTOKENTYPE is Token;
+record YYMINORTYPE is
+  yy0 @at(0): ParseTOKENTYPE;
+  yy79 @at(0): [Type];
+  yy129 @at(0): Arith;
+  yy136 @at(0): Size;
+  yy139 @at(0): [Node];
+  yy143 @at(0): [Symbol];
+  yy154 @at(0): [NestedTypeInit];
+  yy178 @at(0): [LoopLabels];
+end record;
+const YYSTACKDEPTH := 100;
+const YYNSTATE             := 221;
+const YYNRULE              := 140;
+const YYNTOKEN             := 69;
+const YY_MAX_SHIFT         := 220;
+const YY_MIN_SHIFTREDUCE   := 311;
+const YY_MAX_SHIFTREDUCE   := 450;
+const YY_ERROR_ACTION      := 451;
+const YY_ACCEPT_ACTION     := 452;
+const YY_NO_ACTION         := 453;
+const YY_MIN_REDUCE        := 454;
+const YY_MAX_REDUCE        := 593;
+const YY_MAX_RHS_SYMBOLS   := 8;
+
+record yyStackEntry is
+	stateno: YYACTIONTYPE;
+	major: YYCODETYPE;
+	minor: YYMINORTYPE;
+end record;
+
+var yytos: [yyStackEntry];
+var yystack: yyStackEntry[YYSTACKDEPTH+1];
+var yyerrcnt: int8;
+
+# parsing tables
+const YY_ACTTAB_COUNT := 1316;
+var yy_action: YYACTIONTYPE[YY_ACTTAB_COUNT] := {
+  530,  425,  508,  208,   94,  452,    8,   96,  104,  327,
+  186,  185,  110,  317,   55,   39,   17,   40,  571,   76,
+   82,  220,  432,  217,  105,   86,  167,   53,   98,  319,
+  187,  549,   45,  380,  343,   73,   81,  328,  217,  197,
+   80,  369,  180,  191,   83,  516,  217,   45,   51,  593,
+  168,  381,  571,   52,   54,   45,  215,  380,  427,   44,
+   42,   41,  407,  207,   31,  426,  425,  216,  208,  588,
+   64,   88,   96,   75,   49,  179,  418,  110,  317,   55,
+   79,   17,   40,  169,  168,   82,  220,  432,   75,   49,
+   86,  184,   53,   98,  319,  116,  114,   77,  380,  343,
+  147,   81,  164,  124,  197,   80,  369,  180,  191,   83,
+  219,  219,  508,  508,   97,   97,   77,  422,  219,  114,
+  508,  381,   97,  477,   44,   42,   41,  379,  207,   31,
+   14,  425,  216,  208,  219,  172,  508,   96,   97,  203,
+  210,  374,  110,  317,   55,  190,   17,   40,  590,   11,
+   82,  220,  432,   24,  516,   86,  397,   53,   98,  319,
+  132,  114,  150,  380,  343,  147,   81,  206,   68,  197,
+   80,  369,  180,  191,   83,  219,  219,  508,  508,   97,
+   97,  516,  156,  533,  114,  177,   64,   88,  479,   44,
+   42,   41,  184,  207,   31,   18,  425,  216,  208,  219,
+  183,  508,   96,   97,  333,  211,  174,  110,  317,   55,
+   74,   17,   40,  556,  153,   82,  220,  432,  175,  516,
+   86,  190,   53,   98,  319,  124,  115,  380,  380,  343,
+  178,   81,   89,  516,  197,   80,  369,  180,  191,   83,
+  219,  219,  508,  508,   97,   97,   22,   20,   69,  113,
+  201,  537,   24,  144,   44,   42,   41,  415,  207,   31,
+  572,  425,  216,  208,  219,  155,  508,   96,   97,  148,
+  148,   11,  110,  317,   55,  402,   17,   40,  520,  525,
+   82,  220,  432,  380,  516,   86,  402,   53,   98,  319,
+  124,  114,  544,  380,  343,  209,   81,  133,  126,  197,
+   80,  369,  180,  191,   83,  219,  219,  508,  508,   97,
+   97,  166,  219,  219,  508,  508,   97,   97,  100,   44,
+   42,   41,  190,  207,   31,  102,  425,  216,  208,   59,
+  579,  106,   96,  439,  149,  149,   11,  110,  317,   55,
+  548,   17,   40,  193,   24,   82,  220,  432,   16,  312,
+   86,  195,   53,   98,  319,  125,  114,  199,  380,  343,
+  145,   81,  133,  543,  197,   80,  369,  180,  191,   83,
+  219,  219,  508,  508,   97,   97,  212,  219,  527,  508,
+  200,   97,  133,  154,   44,   42,   41,  218,  207,   31,
+  344,   66,  216,  163,  217,  151,  173,  219,  127,  508,
+   56,   97,  516,   45,   51,   58,  516,   57,   40,   52,
+   54,  146,  217,  219,  128,  508,    1,   97,   56,  507,
+  525,   45,   51,   58,  380,  343,    3,   52,   54,  219,
+  516,  508,  369,   97,   48,   50,   35,   32,   33,   34,
+   37,   36,   47,   46,   75,   49,  320,  506,  525,    4,
+  543,  152,   48,   50,   35,   32,   33,   34,   37,   36,
+   47,   46,   75,   49,  574,    5,  101,  118,  112,  111,
+   23,   87,  187,  549,  577,  108,   13,  107,   67,   22,
+   20,   78,  219,  543,  508,    9,   95,  133,  194,   15,
+  129,  553,  185,   22,   20,  383,   10,    2,   92,   91,
+  170,  198,  219,  388,  508,  219,   97,  508,   24,   97,
+  171,   63,  574,   14,   62,  118,  112,  111,   23,    6,
+  103,    7,  205,  108,   13,  107,  187,  549,   24,   99,
+  219,   24,  508,  378,   95,  574,  194,  133,  118,  112,
+  111,   23,  332,  331,   29,   61,   92,   91,  107,  424,
+  419,  213,  219,  219,  508,  508,   97,   95,  171,  194,
+  574,   12,   62,  118,  112,  111,   23,  417,  181,   92,
+   91,   25,   70,  107,  412,  176,  403,   65,  219,  441,
+  508,  171,   95,   90,  194,   62,  440,   71,   84,  408,
+   93,  399,  189,  182,   92,   91,  574,  188,  132,  118,
+  112,  111,   23,   85,   60,  438,  171,   72,  386,  107,
+   62,  385,  196,  219,  219,  508,  508,   97,   95,  574,
+  194,  534,  118,  112,  111,   23,  371,   26,  393,  192,
+   92,   91,  107,  133,  329,   27,  202,  219,  323,  508,
+  204,   95,  171,  194,  109,  322,   62,  214,  219,  321,
+  508,  318,   97,   92,   91,   20,  130,   55,  316,   57,
+   40,  375,  372,   30,   28,  171,  530,  368,   43,   62,
+   53,  219,  453,  508,  423,   97,  380,  343,  453,   81,
+  453,  131,  311,   80,  369,  453,  453,  453,  453,  453,
+  453,  453,   55,   19,   21,   40,  219,  453,  508,  453,
+   97,  453,   44,   42,   41,   53,  117,  119,  453,  453,
+  216,  380,  343,  453,   81,  453,  120,  389,   80,  369,
+  453,  219,  219,  508,  508,   97,   97,   55,  453,   57,
+   40,  219,  453,  508,  453,   97,  453,   44,   42,   41,
+   53,  453,  453,  453,  157,  216,  380,  343,  453,   81,
+  453,  158,  453,   80,  369,  453,  453,  165,  453,  219,
+  453,  508,   55,   97,   57,   40,  219,  453,  508,  453,
+   97,  453,   44,   42,   41,   53,  453,  159,  160,  453,
+  216,  380,  343,  453,   81,  453,  453,  453,   80,  369,
+  376,  453,  219,  219,  508,  508,   97,   97,  453,   55,
+  453,   57,   40,  453,  453,  453,  453,   44,   42,   41,
+  453,  453,   53,  453,  453,  216,  453,  453,  380,  343,
+  344,   81,  453,  453,  217,   80,  369,  453,  453,  453,
+   56,  453,  121,   45,   51,   58,  453,  453,  136,   52,
+   54,  137,  453,  453,   44,   42,   41,  219,  453,  508,
+  453,   97,  216,  219,  453,  508,  219,   97,  508,  453,
+   97,  453,  453,  134,   48,   50,  453,  453,  453,  161,
+  453,  453,   47,   46,   75,   49,  453,  453,  219,  453,
+  508,  217,   97,  135,  219,  453,  508,   56,   97,  453,
+   45,   51,   58,  453,  453,  453,   52,   54,  219,  217,
+  508,  142,   97,  453,  453,   56,  453,  453,   45,   51,
+   58,  453,  453,  315,   52,   54,  219,  453,  508,  453,
+   97,   48,   50,  453,  453,  453,  143,  162,  453,   47,
+   46,   75,   49,  453,  453,  453,  453,  453,  330,   48,
+   50,  219,  219,  508,  508,   97,   97,   47,   46,   75,
+   49,   38,  453,  453,  453,  453,  453,  217,  453,  141,
+  453,  453,  453,   56,  453,  453,   45,   51,   58,  453,
+  453,  453,   52,   54,  219,  217,  508,  140,   97,  453,
+  453,   56,  453,  453,   45,   51,   58,  453,  453,  314,
+   52,   54,  219,  453,  508,  139,   97,   48,   50,  453,
+  453,  453,  122,  453,  453,   47,   46,   75,   49,  453,
+  219,  453,  508,  453,   97,   48,   50,  219,  138,  508,
+  453,   97,  453,   47,   46,   75,   49,  453,  453,  366,
+  453,  453,  217,  219,  453,  508,  453,   97,   56,  453,
+  453,   45,   51,   58,  453,  453,  453,   52,   54,  367,
+  453,  453,  217,  453,  453,  453,  453,  453,   56,  123,
+  453,   45,   51,   58,  453,  453,  453,   52,   54,  453,
+  453,  453,   48,   50,  219,  453,  508,  453,   97,  453,
+   47,   46,   75,   49,  453,  453,  453,  453,  453,  453,
+  453,  453,   48,   50,  453,  453,  453,  453,  453,  453,
+   47,   46,   75,   49,  453,  453,  453,  453,   55,  217,
+   57,   40,  453,  453,  453,   56,  453,  453,   45,   51,
+   58,   53,  453,  313,   52,   54,  453,  380,  343,  453,
+   81,  453,  217,  453,   80,  369,  453,  453,   56,  453,
+  453,   45,   51,   58,  453,  453,  453,   52,   54,   48,
+   50,  453,  453,   44,   42,   41,  453,   47,   46,   75,
+   49,  216,  453,  453,  453,  453,  453,  453,  453,  453,
+  453,  453,   48,   50,  453,  453,  453,  453,  453,  453,
+   47,   46,   75,   49,  453,  453,  453,  453,  453,  217,
+  453,  453,  453,  453,  453,   56,  453,  453,   45,   51,
+   58,  453,  453,  453,   52,   54,  453,  217,  453,  453,
+  453,  453,  453,   56,  453,  453,   45,   51,   58,  453,
+  453,  453,   52,   54,  453,  453,  453,  453,  453,  453,
+   50,  453,  453,  453,  453,  453,  453,   47,   46,   75,
+   49,  453,  453,  453,  453,  453,  453,  453,  453,  453,
+  453,  453,  453,  453,  453,   47,   46,   75,   49,  453,
+  453,  453,  453,  453,  217,  453,  453,  453,  453,  453,
+   56,  453,  453,   45,   51,   58,  453,  453,  453,   52,
+   54,  453,  453,  453,  453,  453,  453,  453,  453,  453,
+  453,  453,  453,  453,  453,  453,  453,  453,  453,  453,
+  453,  453,  453,  453,  453,  453,  453,  453,  453,  453,
+  453,  453,  453,  453,   75,   49,
+};
+var yy_lookahead: YYCODETYPE[] := {
+   89,    1,   91,    3,   93,   69,   70,    7,  103,    9,
+  109,  110,   12,   13,   14,    2,   16,   17,   91,    6,
+   20,   21,   22,    8,  101,   25,   73,   27,   28,   29,
+  107,  108,   17,   33,   34,   17,   36,   37,    8,   39,
+   40,   41,   42,   43,   44,   92,    8,   17,   18,  122,
+  123,   33,   91,   23,   24,   17,   38,   33,   34,   59,
+   60,   61,    4,   63,   64,   41,    1,   67,    3,  113,
+  114,  115,    7,   58,   59,   10,   33,   12,   13,   14,
+   62,   16,   17,  122,  123,   20,   21,   22,   58,   59,
+   25,   33,   27,   28,   29,   74,   74,   16,   33,   34,
+   78,   36,   80,   74,   39,   40,   41,   42,   43,   44,
+   89,   89,   91,   91,   93,   93,   16,   32,   89,   74,
+   91,   33,   93,   78,   59,   60,   61,   33,   63,   64,
+   45,    1,   67,    3,   89,   73,   91,    7,   93,   10,
+   10,    5,   12,   13,   14,   11,   16,   17,  119,  120,
+   20,   21,   22,   17,   92,   25,   22,   27,   28,   29,
+   74,   74,   73,   33,   34,   78,   36,   80,   68,   39,
+   40,   41,   42,   43,   44,   89,   89,   91,   91,   93,
+   93,   92,   96,   97,   74,  113,  114,  115,   78,   59,
+   60,   61,   33,   63,   64,   66,    1,   67,    3,   89,
+   73,   91,    7,   93,    4,   10,   35,   12,   13,   14,
+   16,   16,   17,   92,   73,   20,   21,   22,  116,   92,
+   25,   11,   27,   28,   29,   74,   74,   33,   33,   34,
+  112,   36,  111,   92,   39,   40,   41,   42,   43,   44,
+   89,   89,   91,   91,   93,   93,   46,   47,    6,   74,
+   98,   99,   17,   78,   59,   60,   61,   22,   63,   64,
+    0,    1,   67,    3,   89,   73,   91,    7,   93,  118,
+  119,  120,   12,   13,   14,   65,   16,   17,   90,   91,
+   20,   21,   22,   33,   92,   25,   65,   27,   28,   29,
+   74,   74,   91,   33,   34,   78,   36,   74,   74,   39,
+   40,   41,   42,   43,   44,   89,   89,   91,   91,   93,
+   93,   88,   89,   89,   91,   91,   93,   93,  103,   59,
+   60,   61,   11,   63,   64,  103,    1,   67,    3,    2,
+   86,   87,    7,   22,  118,  119,  120,   12,   13,   14,
+  108,   16,   17,   94,   17,   20,   21,   22,   16,   22,
+   25,   94,   27,   28,   29,   74,   74,   72,   33,   34,
+   78,   36,   74,   72,   39,   40,   41,   42,   43,   44,
+   89,   89,   91,   91,   93,   93,   88,   89,   94,   91,
+   99,   93,   74,   73,   59,   60,   61,   73,   63,   64,
+    4,  100,   67,   72,    8,  102,   88,   89,   74,   91,
+   14,   93,   92,   17,   18,   19,   92,   16,   17,   23,
+   24,   73,    8,   89,   74,   91,   70,   93,   14,   90,
+   91,   17,   18,   19,   33,   34,   70,   23,   24,   89,
+   92,   91,   41,   93,   48,   49,   50,   51,   52,   53,
+   54,   55,   56,   57,   58,   59,   13,   90,   91,   70,
+   72,  102,   48,   49,   50,   51,   52,   53,   54,   55,
+   56,   57,   58,   59,   71,   70,  101,   74,   75,   76,
+   77,  102,  107,  108,   81,   82,   83,   84,  100,   46,
+   47,   85,   89,   72,   91,   70,   93,   74,   95,   79,
+   74,  109,  110,   46,   47,    4,   70,   70,  105,  106,
+   32,   88,   89,    4,   91,   89,   93,   91,   17,   93,
+  117,  100,   71,   45,  121,   74,   75,   76,   77,   70,
+  101,   70,   81,   82,   83,   84,  107,  108,   17,   26,
+   89,   17,   91,   22,   93,   71,   95,   74,   74,   75,
+   76,   77,    6,    6,   45,   45,  105,  106,   84,   22,
+   22,   88,   89,   89,   91,   91,   93,   93,  117,   95,
+   71,   31,  121,   74,   75,   76,   77,    4,  104,  105,
+  106,   16,    6,   84,   20,   10,   25,   65,   89,   22,
+   91,  117,   93,   25,   95,  121,   22,    6,   45,    4,
+    6,    4,   16,  104,  105,  106,   71,   41,   74,   74,
+   75,   76,   77,   25,    2,   22,  117,   65,   22,   84,
+  121,   22,   33,   89,   89,   91,   91,   93,   93,   71,
+   95,   97,   74,   75,   76,   77,   22,    2,    4,  104,
+  105,  106,   84,   74,   22,   45,   64,   89,   12,   91,
+   10,   93,  117,   95,   26,   22,  121,   88,   89,   22,
+   91,   13,   93,  105,  106,   47,   74,   14,   13,   16,
+   17,    5,    4,   16,   45,  117,   16,   33,   59,  121,
+   27,   89,  124,   91,   31,   93,   33,   34,  124,   36,
+  124,   74,   22,   40,   41,  124,  124,  124,  124,  124,
+  124,  124,   14,   15,   16,   17,   89,  124,   91,  124,
+   93,  124,   59,   60,   61,   27,   74,   74,  124,  124,
+   67,   33,   34,  124,   36,  124,   74,    4,   40,   41,
+  124,   89,   89,   91,   91,   93,   93,   14,  124,   16,
+   17,   89,  124,   91,  124,   93,  124,   59,   60,   61,
+   27,  124,  124,  124,   74,   67,   33,   34,  124,   36,
+  124,   74,  124,   40,   41,  124,  124,    9,  124,   89,
+  124,   91,   14,   93,   16,   17,   89,  124,   91,  124,
+   93,  124,   59,   60,   61,   27,  124,   74,   74,  124,
+   67,   33,   34,  124,   36,  124,  124,  124,   40,   41,
+    5,  124,   89,   89,   91,   91,   93,   93,  124,   14,
+  124,   16,   17,  124,  124,  124,  124,   59,   60,   61,
+  124,  124,   27,  124,  124,   67,  124,  124,   33,   34,
+    4,   36,  124,  124,    8,   40,   41,  124,  124,  124,
+   14,  124,   74,   17,   18,   19,  124,  124,   74,   23,
+   24,   74,  124,  124,   59,   60,   61,   89,  124,   91,
+  124,   93,   67,   89,  124,   91,   89,   93,   91,  124,
+   93,  124,  124,   74,   48,   49,  124,  124,  124,   74,
+  124,  124,   56,   57,   58,   59,  124,  124,   89,  124,
+   91,    8,   93,   74,   89,  124,   91,   14,   93,  124,
+   17,   18,   19,  124,  124,  124,   23,   24,   89,    8,
+   91,   74,   93,  124,  124,   14,  124,  124,   17,   18,
+   19,  124,  124,   22,   23,   24,   89,  124,   91,  124,
+   93,   48,   49,  124,  124,  124,   74,   74,  124,   56,
+   57,   58,   59,  124,  124,  124,  124,  124,   65,   48,
+   49,   89,   89,   91,   91,   93,   93,   56,   57,   58,
+   59,    2,  124,  124,  124,  124,  124,    8,  124,   74,
+  124,  124,  124,   14,  124,  124,   17,   18,   19,  124,
+  124,  124,   23,   24,   89,    8,   91,   74,   93,  124,
+  124,   14,  124,  124,   17,   18,   19,  124,  124,   22,
+   23,   24,   89,  124,   91,   74,   93,   48,   49,  124,
+  124,  124,   74,  124,  124,   56,   57,   58,   59,  124,
+   89,  124,   91,  124,   93,   48,   49,   89,   74,   91,
+  124,   93,  124,   56,   57,   58,   59,  124,  124,    5,
+  124,  124,    8,   89,  124,   91,  124,   93,   14,  124,
+  124,   17,   18,   19,  124,  124,  124,   23,   24,    5,
+  124,  124,    8,  124,  124,  124,  124,  124,   14,   74,
+  124,   17,   18,   19,  124,  124,  124,   23,   24,  124,
+  124,  124,   48,   49,   89,  124,   91,  124,   93,  124,
+   56,   57,   58,   59,  124,  124,  124,  124,  124,  124,
+  124,  124,   48,   49,  124,  124,  124,  124,  124,  124,
+   56,   57,   58,   59,  124,  124,  124,  124,   14,    8,
+   16,   17,  124,  124,  124,   14,  124,  124,   17,   18,
+   19,   27,  124,   22,   23,   24,  124,   33,   34,  124,
+   36,  124,    8,  124,   40,   41,  124,  124,   14,  124,
+  124,   17,   18,   19,  124,  124,  124,   23,   24,   48,
+   49,  124,  124,   59,   60,   61,  124,   56,   57,   58,
+   59,   67,  124,  124,  124,  124,  124,  124,  124,  124,
+  124,  124,   48,   49,  124,  124,  124,  124,  124,  124,
+   56,   57,   58,   59,  124,  124,  124,  124,  124,    8,
+  124,  124,  124,  124,  124,   14,  124,  124,   17,   18,
+   19,  124,  124,  124,   23,   24,  124,    8,  124,  124,
+  124,  124,  124,   14,  124,  124,   17,   18,   19,  124,
+  124,  124,   23,   24,  124,  124,  124,  124,  124,  124,
+   49,  124,  124,  124,  124,  124,  124,   56,   57,   58,
+   59,  124,  124,  124,  124,  124,  124,  124,  124,  124,
+  124,  124,  124,  124,  124,   56,   57,   58,   59,  124,
+  124,  124,  124,  124,    8,  124,  124,  124,  124,  124,
+   14,  124,  124,   17,   18,   19,  124,  124,  124,   23,
+   24,  124,  124,  124,  124,  124,  124,  124,  124,  124,
+  124,  124,  124,  124,  124,  124,  124,  124,  124,  124,
+  124,  124,  124,  124,  124,  124,  124,  124,  124,  124,
+  124,  124,  124,  124,   58,   59,  124,  124,  124,  124,
+  124,  124,  124,  124,  124,  124,  124,  124,  124,  124,
+  124,  124,  124,  124,   69,   69,   69,   69,   69,   69,
+   69,   69,   69,   69,   69,   69,   69,   69,   69,   69,
+   69,   69,   69,   69,   69,   69,   69,   69,   69,   69,
+   69,   69,   69,   69,   69,   69,   69,   69,   69,   69,
+   69,   69,   69,   69,   69,   69,   69,   69,   69,   69,
+   69,   69,   69,   69,   69,
+};
+const YY_SHIFT_COUNT    := 220;
+const YY_SHIFT_MIN      := 0;
+const YY_SHIFT_MAX      := 1256;
+typedef YYTOKENOFFSETTYPE is uint16;
+var yy_shift_ofst: YYTOKENOFFSETTYPE[] := {
+ 1316,    0,    0,   65,   65,   65,  130,  195,  260,  325,
+  325,  643,  643,  678,  643,  678,  713, 1094,  748,  678,
+  678,  678,  678,  678,  785, 1094, 1094, 1094, 1094, 1094,
+ 1094, 1094, 1094, 1094, 1094, 1094, 1094, 1094, 1094, 1094,
+ 1094, 1094, 1094, 1094, 1094, 1094, 1094, 1094, 1094, 1094,
+ 1094, 1094, 1094, 1094, 1094, 1094, 1094, 1094, 1094, 1094,
+  391,   24,   24,  100,   43,   43,   81,   81,   18,   18,
+   18,   18,   18,   18,   18,   18,   18,   58,  129,  194,
+  194,  194,   88,   94,  159,   94,   94,  210,  171,  242,
+  250,  221,  221,   81,  332,  332,   94,  332,   94, 1316,
+ 1316, 1316, 1316, 1316, 1316, 1316, 1316, 1316, 1316, 1316,
+ 1316, 1316, 1316,  386,  404,  816,  873,  891,  949,  967,
+ 1024, 1044,  816, 1101, 1124, 1124, 1124, 1124, 1124, 1124,
+ 1124, 1124, 1124, 1124, 1181, 1199, 1256, 1256,   30,   30,
+   30,   15,   15,   15,  200,  433,  327,  447,   85,  468,
+  235,  134,  311,  511,  491,  136,  499,   38,   38,   38,
+   38,   38,   38,   13,  503,  536,  537,  514,  500,  527,
+  528,  530,  514,  563,  555,  566,  554,  565,  512,  551,
+  558,  557,  564,  514,  581,  543,  585,  584,  587,  556,
+  576,  578,  583,  586,  602,  589,  542,  579,  604,  625,
+  624,  590,  612,  572,  626,  630,  618,  623,  627,  608,
+  638,  645,  656,  658,  619,  647,  609,  634,  514,  650,
+  660,
+};
+const YY_REDUCE_COUNT := 112;
+const YY_REDUCE_MIN   := -99;
+const YY_REDUCE_MAX   := 985;
+var yy_reduce_ofst: int16[] := {
+  -64,  393,  441,  464,  489,  525,  548,  548,  548,  548,
+  548,  151,  216,   22,   29,   87,   86,  152,  223,   45,
+  110,  175,  217,  282,  288,  308,  413,  281,  463,  524,
+  559,   21,  224,  324,  340,  416,  582,  607,  632,  633,
+  642,  670,  677,  703,  704,  758,  764,  767,  789,  795,
+  809,  827,  852,  853,  885,  903,  921,  928,  944,  985,
+  -89,  -73,  -39,  -77,  -44,   72,  365,  419,  -47,   62,
+   89,  127,  141,  192,  310,  314,  338,  -99,  244,  188,
+  329,  357,  121,  291,  382,  378,  411,  -95,  102,  118,
+  201,  215,  222,  232,  249,  257,  285,  284,  321,  346,
+  356,  293,  379,  349,  395,  369,  415,  396,  426,  427,
+  410,  449,  451,
+};
+var yy_default: YYACTIONTYPE[YYNSTATE] := {
+  573,  469,  469,  451,  451,  451,  451,  451,  451,  580,
+  576,  591,  591,  451,  591,  451,  451,  451,  451,  451,
+  451,  451,  451,  451,  451,  451,  451,  451,  451,  451,
+  451,  451,  451,  451,  451,  451,  451,  451,  451,  451,
+  451,  451,  451,  451,  451,  451,  451,  451,  451,  451,
+  451,  451,  451,  451,  451,  451,  451,  451,  451,  563,
+  451,  451,  451,  451,  587,  587,  451,  451,  451,  451,
+  451,  451,  451,  451,  451,  451,  451,  451,  451,  451,
+  451,  451,  451,  451,  451,  451,  451,  451,  559,  586,
+  451,  451,  451,  451,  451,  451,  451,  451,  451,  573,
+  573,  585,  573,  585,  573,  585,  573,  578,  573,  573,
+  467,  573,  573,  451,  451,  539,  451,  451,  451,  451,
+  451,  451,  451,  451,  564,  539,  485,  484,  483,  482,
+  481,  480,  535,  513,  498,  496,  500,  499,  491,  492,
+  489,  493,  495,  494,  451,  451,  451,  468,  451,  451,
+  451,  451,  451,  451,  451,  451,  451,  505,  504,  503,
+  502,  497,  490,  451,  451,  451,  451,  541,  592,  451,
+  451,  451,  557,  451,  451,  451,  451,  451,  451,  451,
+  451,  451,  451,  554,  451,  552,  451,  547,  451,  451,
+  451,  451,  451,  451,  451,  527,  451,  451,  451,  451,
+  538,  451,  451,  451,  451,  451,  451,  451,  451,  478,
+  451,  451,  451,  451,  451,  451,  451,  451,  501,  488,
+  451,
+};
+
+# fallback rules
+
+# token names
+var yyTokenName: [uint8][] := { 
+  "$", # 0
+  "ASM", # 1
+  "ASSIGN", # 2
+  "BREAK", # 3
+  "CLOSEPAREN", # 4
+  "CLOSESQ", # 5
+  "COLON", # 6
+  "CONST", # 7
+  "DOT", # 8
+  "ELSE", # 9
+  "END", # 10
+  "EXTERN", # 11
+  "IF", # 12
+  "LOOP", # 13
+  "MINUS", # 14
+  "NOT", # 15
+  "OPENPAREN", # 16
+  "OPENSQ", # 17
+  "PERCENT", # 18
+  "PLUS", # 19
+  "RECORD", # 20
+  "RETURN", # 21
+  "SEMICOLON", # 22
+  "SLASH", # 23
+  "STAR", # 24
+  "SUB", # 25
+  "THEN", # 26
+  "TILDE", # 27
+  "VAR", # 28
+  "WHILE", # 29
+  "TYPE", # 30
+  "OPENBR", # 31
+  "CLOSEBR", # 32
+  "ID", # 33
+  "NUMBER", # 34
+  "AT", # 35
+  "BYTESOF", # 36
+  "ELSEIF", # 37
+  "INT", # 38
+  "TYPEDEF", # 39
+  "SIZEOF", # 40
+  "STRING", # 41
+  "IMPL", # 42
+  "DECL", # 43
+  "INTERFACE", # 44
+  "COMMA", # 45
+  "AND", # 46
+  "OR", # 47
+  "PIPE", # 48
+  "CARET", # 49
+  "LTOP", # 50
+  "LEOP", # 51
+  "GTOP", # 52
+  "GEOP", # 53
+  "EQOP", # 54
+  "NEOP", # 55
+  "LSHIFT", # 56
+  "RSHIFT", # 57
+  "AS", # 58
+  "AMPERSAND", # 59
+  "NEXT", # 60
+  "PREV", # 61
+  "INDEXOF", # 62
+  "CONTINUE", # 63
+  "CASE", # 64
+  "IS", # 65
+  "WHEN", # 66
+  "ALIAS", # 67
+  "IMPLEMENTS", # 68
+};
+
+# rule names
+#var yyRuleName: [uint8][YYNRULE] := {
+#};
+
+# destructors
+sub yy_destructor(yymajor: YYCODETYPE, yypminor: [YYMINORTYPE]) is
+sub token_destructor() is
+#line 46 "src/cowfe/parser.y"
+
+	if (yymajor == STRING) or (yymajor == ID) then
+		print("free unused string\n");
+		Free(yypminor.yy0.string as [uint8]);
+	end if;
+
+#line 658 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+if (yymajor != 0) and (yymajor < YYNTOKEN)
+  then token_destructor();
+end if;
+end sub;
+
+# stack overflow code
+
+sub yy_pop_parser_stack() is
+	yytos := @prev yytos;
+	yy_destructor(yytos.major, &yytos.minor);
+end sub;
+
+sub yy_pop_all_parser_stack() is
+	while yytos != &yystack[0] loop
+		yy_pop_parser_stack();
+	end loop;
+end sub;
+
+sub yy_stack_overflow() is
+	yy_pop_all_parser_stack();
+#line 39 "src/cowfe/parser.y"
+
+	StartError();
+	print("parser stack overflow");
+	EndError();
+#line 685 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+
+# For rule J, yyRuleInfoLhs[J] contains the symbol on the left-hand side
+# of that rule
+var yyRuleInfoLhs: YYCODETYPE[] := {
+    71,  # (0) statement ::= RETURN SEMICOLON
+    71,  # (1) statement ::= VAR newid COLON typeref SEMICOLON
+    71,  # (2) statement ::= VAR newid COLON typeref ASSIGN expression SEMICOLON
+    71,  # (3) statement ::= VAR newid ASSIGN expression SEMICOLON
+    71,  # (4) statement ::= expression ASSIGN expression SEMICOLON
+    71,  # (5) statement ::= startloopstatement statements END LOOP
+    75,  # (6) startloopstatement ::= LOOP
+    71,  # (7) statement ::= startwhilestatement statements END LOOP
+    77,  # (8) initwhilestatement ::= WHILE
+    76,  # (9) startwhilestatement ::= initwhilestatement conditional LOOP
+    71,  # (10) statement ::= BREAK SEMICOLON
+    71,  # (11) statement ::= CONTINUE SEMICOLON
+    71,  # (12) statement ::= IF if_begin if_conditional THEN statements if_optional_else END IF
+    79,  # (13) if_begin ::=
+    80,  # (14) if_conditional ::= conditional
+    81,  # (15) if_optional_else ::=
+    82,  # (16) if_else ::= ELSE
+    83,  # (17) if_elseif ::= ELSEIF
+    71,  # (18) statement ::= startcase whens END CASE SEMICOLON
+    84,  # (19) startcase ::= CASE expression IS
+    87,  # (20) beginwhen ::= WHEN cvalue COLON
+    87,  # (21) beginwhen ::= WHEN ELSE COLON
+    78,  # (22) conditional ::= OPENPAREN conditional CLOSEPAREN
+    78,  # (23) conditional ::= NOT conditional
+    78,  # (24) conditional ::= conditional AND conditional
+    78,  # (25) conditional ::= conditional OR conditional
+    78,  # (26) conditional ::= expression EQOP expression
+    78,  # (27) conditional ::= expression NEOP expression
+    78,  # (28) conditional ::= expression LTOP expression
+    78,  # (29) conditional ::= expression GEOP expression
+    78,  # (30) conditional ::= expression GTOP expression
+    78,  # (31) conditional ::= expression LEOP expression
+    89,  # (32) leafexpression ::= NUMBER
+    89,  # (33) leafexpression ::= OPENPAREN expression CLOSEPAREN
+    74,  # (34) expression ::= leafexpression
+    74,  # (35) expression ::= MINUS expression
+    74,  # (36) expression ::= TILDE expression
+    74,  # (37) expression ::= expression PLUS expression
+    74,  # (38) expression ::= expression MINUS expression
+    74,  # (39) expression ::= expression STAR expression
+    74,  # (40) expression ::= expression SLASH expression
+    74,  # (41) expression ::= expression PERCENT expression
+    74,  # (42) expression ::= expression CARET expression
+    74,  # (43) expression ::= expression AMPERSAND expression
+    74,  # (44) expression ::= expression PIPE expression
+    74,  # (45) expression ::= expression LSHIFT expression
+    74,  # (46) expression ::= expression RSHIFT expression
+    74,  # (47) expression ::= expression AS typeref
+    74,  # (48) expression ::= AMPERSAND expression
+    74,  # (49) expression ::= ALIAS AMPERSAND expression
+    74,  # (50) expression ::= NEXT expression
+    74,  # (51) expression ::= PREV expression
+    74,  # (52) expression ::= BYTESOF varortypeid
+    74,  # (53) expression ::= SIZEOF varortypeid
+    89,  # (54) leafexpression ::= oldid
+    89,  # (55) leafexpression ::= OPENSQ expression CLOSESQ
+    74,  # (56) expression ::= expression OPENSQ expression CLOSESQ
+    74,  # (57) expression ::= expression DOT ID
+    89,  # (58) leafexpression ::= STRING
+    88,  # (59) cvalue ::= expression
+    71,  # (60) statement ::= CONST newid ASSIGN cvalue SEMICOLON
+    73,  # (61) typeref ::= INT OPENPAREN cvalue COMMA cvalue CLOSEPAREN
+    73,  # (62) typeref ::= eitherid
+    73,  # (63) typeref ::= OPENSQ typeref CLOSESQ
+    73,  # (64) typeref ::= typeref OPENSQ cvalue CLOSESQ
+    73,  # (65) typeref ::= typeref OPENSQ CLOSESQ
+    73,  # (66) typeref ::= INDEXOF varortypeid
+    71,  # (67) statement ::= TYPEDEF ID IS typeref SEMICOLON
+    72,  # (68) newid ::= ID
+    91,  # (69) oldid ::= ID
+    92,  # (70) eitherid ::= ID
+    90,  # (71) varortypeid ::= oldid
+    90,  # (72) varortypeid ::= OPENPAREN typeref CLOSEPAREN
+    74,  # (73) expression ::= startsubcall inputargs
+    71,  # (74) statement ::= startsubcall inputargs SEMICOLON
+    71,  # (75) statement ::= outputargs ASSIGN startsubcall inputargs SEMICOLON
+    93,  # (76) startsubcall ::= leafexpression
+    94,  # (77) inputargs ::= OPENPAREN inputarglist CLOSEPAREN
+    94,  # (78) inputargs ::= OPENPAREN CLOSEPAREN
+    96,  # (79) inputarglist ::= inputarg
+    96,  # (80) inputarglist ::= inputarglist COMMA inputarg
+    97,  # (81) inputarg ::= expression
+    95,  # (82) outputargs ::= OPENPAREN outputarglist COMMA outputarg CLOSEPAREN
+    98,  # (83) outputarglist ::= outputarg
+    98,  # (84) outputarglist ::= outputarglist COMMA outputarg
+    99,  # (85) outputarg ::= expression
+    71,  # (86) statement ::= INTERFACE newsubid subparams submodifiers SEMICOLON
+   106,  # (87) implementsstart ::= SUB newsubid IMPLEMENTS typeref
+   102,  # (88) submodifiers ::= submodifiers EXTERN OPENPAREN STRING CLOSEPAREN
+   100,  # (89) newsubid ::= newid
+   105,  # (90) subimpldecl ::= IMPL SUB oldid
+   103,  # (91) substart ::= IS
+   104,  # (92) subend ::= END SUB
+   101,  # (93) subparams ::= inparamlist
+   101,  # (94) subparams ::= inparamlist COLON paramlist
+   107,  # (95) inparamlist ::= paramlist
+   108,  # (96) paramlist ::= OPENPAREN CLOSEPAREN
+   108,  # (97) paramlist ::= OPENPAREN params CLOSEPAREN
+   109,  # (98) params ::= param
+   109,  # (99) params ::= param COMMA params
+   110,  # (100) param ::= ID COLON typeref
+    71,  # (101) statement ::= RECORD recordstart recordinherits IS recordmembers END RECORD
+   111,  # (102) recordstart ::= eitherid
+   112,  # (103) recordinherits ::= COLON typeref
+   114,  # (104) recordmember ::= memberid recordat COLON typeref SEMICOLON
+   116,  # (105) recordat ::=
+   116,  # (106) recordat ::= AT OPENPAREN cvalue CLOSEPAREN
+   115,  # (107) memberid ::= ID
+    71,  # (108) statement ::= initdecl OPENBR initialisers CLOSEBR SEMICOLON
+   117,  # (109) initdecl ::= VAR newid COLON typeref ASSIGN
+   119,  # (110) initialiser ::= expression
+   119,  # (111) initialiser ::= startbracedinitialiser initialisers CLOSEBR
+   120,  # (112) startbracedinitialiser ::= OPENBR
+    71,  # (113) statement ::= asmstart asms SEMICOLON
+   121,  # (114) asmstart ::= ASM
+   123,  # (115) asm ::= STRING
+   123,  # (116) asm ::= NUMBER
+   123,  # (117) asm ::= oldid
+    69,  # (118) program ::= statements
+    70,  # (119) statements ::=
+    70,  # (120) statements ::= statements statement
+    71,  # (121) statement ::= SEMICOLON
+    81,  # (122) if_optional_else ::= if_else statements
+    81,  # (123) if_optional_else ::= if_elseif if_conditional THEN statements if_optional_else
+    85,  # (124) whens ::=
+    85,  # (125) whens ::= whens when
+    86,  # (126) when ::= beginwhen statements
+    71,  # (127) statement ::= SUB newsubid subparams submodifiers substart statements subend SEMICOLON
+    71,  # (128) statement ::= DECL SUB newsubid subparams submodifiers SEMICOLON
+    71,  # (129) statement ::= subimpldecl substart statements subend SEMICOLON
+    71,  # (130) statement ::= implementsstart substart statements subend SEMICOLON
+   102,  # (131) submodifiers ::=
+   112,  # (132) recordinherits ::=
+   113,  # (133) recordmembers ::=
+   113,  # (134) recordmembers ::= recordmember recordmembers
+   118,  # (135) initialisers ::= initialiser
+   118,  # (136) initialisers ::= initialisers COMMA initialiser
+   119,  # (137) initialiser ::=
+   122,  # (138) asms ::= asm
+   122,  # (139) asms ::= asm COMMA asms
+};
+
+# For rule J, yyRuleInfoNRhs[J] contains the number of symbols on the
+# right-hand side of that rule.
+var yyRuleInfoNRhs: uint8[] := {
+    2,  # (0) statement ::= RETURN SEMICOLON
+    5,  # (1) statement ::= VAR newid COLON typeref SEMICOLON
+    7,  # (2) statement ::= VAR newid COLON typeref ASSIGN expression SEMICOLON
+    5,  # (3) statement ::= VAR newid ASSIGN expression SEMICOLON
+    4,  # (4) statement ::= expression ASSIGN expression SEMICOLON
+    4,  # (5) statement ::= startloopstatement statements END LOOP
+    1,  # (6) startloopstatement ::= LOOP
+    4,  # (7) statement ::= startwhilestatement statements END LOOP
+    1,  # (8) initwhilestatement ::= WHILE
+    3,  # (9) startwhilestatement ::= initwhilestatement conditional LOOP
+    2,  # (10) statement ::= BREAK SEMICOLON
+    2,  # (11) statement ::= CONTINUE SEMICOLON
+    8,  # (12) statement ::= IF if_begin if_conditional THEN statements if_optional_else END IF
+    0,  # (13) if_begin ::=
+    1,  # (14) if_conditional ::= conditional
+    0,  # (15) if_optional_else ::=
+    1,  # (16) if_else ::= ELSE
+    1,  # (17) if_elseif ::= ELSEIF
+    5,  # (18) statement ::= startcase whens END CASE SEMICOLON
+    3,  # (19) startcase ::= CASE expression IS
+    3,  # (20) beginwhen ::= WHEN cvalue COLON
+    3,  # (21) beginwhen ::= WHEN ELSE COLON
+    3,  # (22) conditional ::= OPENPAREN conditional CLOSEPAREN
+    2,  # (23) conditional ::= NOT conditional
+    3,  # (24) conditional ::= conditional AND conditional
+    3,  # (25) conditional ::= conditional OR conditional
+    3,  # (26) conditional ::= expression EQOP expression
+    3,  # (27) conditional ::= expression NEOP expression
+    3,  # (28) conditional ::= expression LTOP expression
+    3,  # (29) conditional ::= expression GEOP expression
+    3,  # (30) conditional ::= expression GTOP expression
+    3,  # (31) conditional ::= expression LEOP expression
+    1,  # (32) leafexpression ::= NUMBER
+    3,  # (33) leafexpression ::= OPENPAREN expression CLOSEPAREN
+    1,  # (34) expression ::= leafexpression
+    2,  # (35) expression ::= MINUS expression
+    2,  # (36) expression ::= TILDE expression
+    3,  # (37) expression ::= expression PLUS expression
+    3,  # (38) expression ::= expression MINUS expression
+    3,  # (39) expression ::= expression STAR expression
+    3,  # (40) expression ::= expression SLASH expression
+    3,  # (41) expression ::= expression PERCENT expression
+    3,  # (42) expression ::= expression CARET expression
+    3,  # (43) expression ::= expression AMPERSAND expression
+    3,  # (44) expression ::= expression PIPE expression
+    3,  # (45) expression ::= expression LSHIFT expression
+    3,  # (46) expression ::= expression RSHIFT expression
+    3,  # (47) expression ::= expression AS typeref
+    2,  # (48) expression ::= AMPERSAND expression
+    3,  # (49) expression ::= ALIAS AMPERSAND expression
+    2,  # (50) expression ::= NEXT expression
+    2,  # (51) expression ::= PREV expression
+    2,  # (52) expression ::= BYTESOF varortypeid
+    2,  # (53) expression ::= SIZEOF varortypeid
+    1,  # (54) leafexpression ::= oldid
+    3,  # (55) leafexpression ::= OPENSQ expression CLOSESQ
+    4,  # (56) expression ::= expression OPENSQ expression CLOSESQ
+    3,  # (57) expression ::= expression DOT ID
+    1,  # (58) leafexpression ::= STRING
+    1,  # (59) cvalue ::= expression
+    5,  # (60) statement ::= CONST newid ASSIGN cvalue SEMICOLON
+    6,  # (61) typeref ::= INT OPENPAREN cvalue COMMA cvalue CLOSEPAREN
+    1,  # (62) typeref ::= eitherid
+    3,  # (63) typeref ::= OPENSQ typeref CLOSESQ
+    4,  # (64) typeref ::= typeref OPENSQ cvalue CLOSESQ
+    3,  # (65) typeref ::= typeref OPENSQ CLOSESQ
+    2,  # (66) typeref ::= INDEXOF varortypeid
+    5,  # (67) statement ::= TYPEDEF ID IS typeref SEMICOLON
+    1,  # (68) newid ::= ID
+    1,  # (69) oldid ::= ID
+    1,  # (70) eitherid ::= ID
+    1,  # (71) varortypeid ::= oldid
+    3,  # (72) varortypeid ::= OPENPAREN typeref CLOSEPAREN
+    2,  # (73) expression ::= startsubcall inputargs
+    3,  # (74) statement ::= startsubcall inputargs SEMICOLON
+    5,  # (75) statement ::= outputargs ASSIGN startsubcall inputargs SEMICOLON
+    1,  # (76) startsubcall ::= leafexpression
+    3,  # (77) inputargs ::= OPENPAREN inputarglist CLOSEPAREN
+    2,  # (78) inputargs ::= OPENPAREN CLOSEPAREN
+    1,  # (79) inputarglist ::= inputarg
+    3,  # (80) inputarglist ::= inputarglist COMMA inputarg
+    1,  # (81) inputarg ::= expression
+    5,  # (82) outputargs ::= OPENPAREN outputarglist COMMA outputarg CLOSEPAREN
+    1,  # (83) outputarglist ::= outputarg
+    3,  # (84) outputarglist ::= outputarglist COMMA outputarg
+    1,  # (85) outputarg ::= expression
+    5,  # (86) statement ::= INTERFACE newsubid subparams submodifiers SEMICOLON
+    4,  # (87) implementsstart ::= SUB newsubid IMPLEMENTS typeref
+    5,  # (88) submodifiers ::= submodifiers EXTERN OPENPAREN STRING CLOSEPAREN
+    1,  # (89) newsubid ::= newid
+    3,  # (90) subimpldecl ::= IMPL SUB oldid
+    1,  # (91) substart ::= IS
+    2,  # (92) subend ::= END SUB
+    1,  # (93) subparams ::= inparamlist
+    3,  # (94) subparams ::= inparamlist COLON paramlist
+    1,  # (95) inparamlist ::= paramlist
+    2,  # (96) paramlist ::= OPENPAREN CLOSEPAREN
+    3,  # (97) paramlist ::= OPENPAREN params CLOSEPAREN
+    1,  # (98) params ::= param
+    3,  # (99) params ::= param COMMA params
+    3,  # (100) param ::= ID COLON typeref
+    7,  # (101) statement ::= RECORD recordstart recordinherits IS recordmembers END RECORD
+    1,  # (102) recordstart ::= eitherid
+    2,  # (103) recordinherits ::= COLON typeref
+    5,  # (104) recordmember ::= memberid recordat COLON typeref SEMICOLON
+    0,  # (105) recordat ::=
+    4,  # (106) recordat ::= AT OPENPAREN cvalue CLOSEPAREN
+    1,  # (107) memberid ::= ID
+    5,  # (108) statement ::= initdecl OPENBR initialisers CLOSEBR SEMICOLON
+    5,  # (109) initdecl ::= VAR newid COLON typeref ASSIGN
+    1,  # (110) initialiser ::= expression
+    3,  # (111) initialiser ::= startbracedinitialiser initialisers CLOSEBR
+    1,  # (112) startbracedinitialiser ::= OPENBR
+    3,  # (113) statement ::= asmstart asms SEMICOLON
+    1,  # (114) asmstart ::= ASM
+    1,  # (115) asm ::= STRING
+    1,  # (116) asm ::= NUMBER
+    1,  # (117) asm ::= oldid
+    1,  # (118) program ::= statements
+    0,  # (119) statements ::=
+    2,  # (120) statements ::= statements statement
+    1,  # (121) statement ::= SEMICOLON
+    2,  # (122) if_optional_else ::= if_else statements
+    5,  # (123) if_optional_else ::= if_elseif if_conditional THEN statements if_optional_else
+    0,  # (124) whens ::=
+    2,  # (125) whens ::= whens when
+    2,  # (126) when ::= beginwhen statements
+    8,  # (127) statement ::= SUB newsubid subparams submodifiers substart statements subend SEMICOLON
+    6,  # (128) statement ::= DECL SUB newsubid subparams submodifiers SEMICOLON
+    5,  # (129) statement ::= subimpldecl substart statements subend SEMICOLON
+    5,  # (130) statement ::= implementsstart substart statements subend SEMICOLON
+    0,  # (131) submodifiers ::=
+    0,  # (132) recordinherits ::=
+    0,  # (133) recordmembers ::=
+    2,  # (134) recordmembers ::= recordmember recordmembers
+    1,  # (135) initialisers ::= initialiser
+    3,  # (136) initialisers ::= initialisers COMMA initialiser
+    0,  # (137) initialiser ::=
+    1,  # (138) asms ::= asm
+    3,  # (139) asms ::= asm COMMA asms
+};
+
+sub yy_trace_shift(stateno: YYACTIONTYPE, msg: string) is
+	print(msg);
+	print(" '");
+	print(yyTokenName[yytos.major]);
+	print("', go to state ");
+	print_i16(stateno as uint16);
+	print_nl();
+end sub;
+
+sub CopyMinor(src: [YYMINORTYPE], dest: [YYMINORTYPE]) is
+	MemCopy(src as [uint8], @bytesof YYMINORTYPE, dest as [uint8]);
+end sub;
+
+sub yy_reduce(yyruleno: YYACTIONTYPE, yylookahead: YYCODETYPE): (yyact: YYACTIONTYPE) is
+	var yysize := yyRuleInfoNRhs[yyruleno as @indexof yyRuleInfoNRhs];
+	#print("Reduce ");
+	#print_i16(yyruleno);
+	#if yysize != 0 then
+	#	print(", go to state ");
+	#	print_i16([yytos - (yysize as intptr)*@bytesof yyStackEntry].stateno);
+	#end if;
+	#print_nl();
+
+	if yytos == &yystack[YYSTACKDEPTH] then
+		yy_stack_overflow();
+	end if;
+
+	var yylhs: YYMINORTYPE;
+	var yyrhs: YYMINORTYPE[YY_MAX_RHS_SYMBOLS];
+	var pout := &yyrhs[0];
+	var c := yysize;
+	while c != 0 loop
+		CopyMinor(&yytos.minor, pout);
+		yytos := @prev yytos;
+		pout := @next pout;
+		c := c - 1;
+	end loop;
+interface Reducer();
+sub reduce_0 implements Reducer is # 1 symbols on RHS
+#line 65 "src/cowfe/parser.y"
+
+	Generate(MidReturn());
+
+#line 1021 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_1 implements Reducer is # 4 symbols on RHS
+#line 72 "src/cowfe/parser.y"
+
+	InitVariable(current_subr, yyrhs[3].yy143, yyrhs[1].yy79);
+
+#line 1029 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(6,&yyrhs[2]);
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_2 implements Reducer is # 6 symbols on RHS
+#line 77 "src/cowfe/parser.y"
+
+	InitVariable(current_subr, yyrhs[5].yy143, yyrhs[3].yy79);
+    CheckExpressionType(yyrhs[1].yy139, yyrhs[5].yy143.vardata.type);
+
+	var w := yyrhs[1].yy139.type.width as uint8;
+    Generate(MidStore(w, yyrhs[1].yy139, MidDeref(w, MidAddress(yyrhs[5].yy143, 0))));
+
+#line 1042 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(6,&yyrhs[4]);
+  yy_destructor(2,&yyrhs[2]);
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_3 implements Reducer is # 4 symbols on RHS
+#line 86 "src/cowfe/parser.y"
+
+	var type := yyrhs[1].yy139.type;
+	if type == (0 as [Type]) then
+		SimpleError("types cannot be inferred for numeric constants");
+	end if;
+	if IsScalar(type) == 0 then
+		SimpleError("you can only assign to lvalues");
+	end if;
+
+	InitVariable(current_subr, yyrhs[3].yy143, type);
+	CheckExpressionType(yyrhs[1].yy139, yyrhs[3].yy143.vardata.type);
+
+	var w := yyrhs[1].yy139.type.width as uint8;
+    Generate(MidStore(w, yyrhs[1].yy139, MidDeref(w, MidAddress(yyrhs[3].yy143, 0))));
+
+#line 1064 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(2,&yyrhs[2]);
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_4 implements Reducer is # 3 symbols on RHS
+#line 105 "src/cowfe/parser.y"
+
+	var type := yyrhs[3].yy139.type;
+	var address := UndoLValue(yyrhs[3].yy139);
+
+	CheckExpressionType(yyrhs[1].yy139, type);
+	var w := type.width as uint8;
+    Generate(MidStore(w, yyrhs[1].yy139, MidDeref(w, address)));
+
+#line 1078 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(2,&yyrhs[2]);
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_5 implements Reducer is # 3 symbols on RHS
+#line 138 "src/cowfe/parser.y"
+
+	TerminateNormalLoop(yyrhs[3].yy178);
+
+#line 1087 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(10,&yyrhs[1]);
+  yy_destructor(13,&yyrhs[0]);
+end sub;
+sub reduce_6 implements Reducer is # 0 symbols on RHS
+#line 144 "src/cowfe/parser.y"
+
+	yylhs.yy178 := BeginNormalLoop();
+	Generate(MidLabel(continue_label));
+
+#line 1097 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_7 implements Reducer is # 3 symbols on RHS
+#line 152 "src/cowfe/parser.y"
+
+	TerminateNormalLoop(yyrhs[3].yy178);
+
+#line 1104 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(10,&yyrhs[1]);
+  yy_destructor(13,&yyrhs[0]);
+end sub;
+sub reduce_8 implements Reducer is # 0 symbols on RHS
+#line 158 "src/cowfe/parser.y"
+
+	yylhs.yy178 := BeginNormalLoop();
+	Generate(MidLabel(continue_label));
+
+#line 1114 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_9 implements Reducer is # 2 symbols on RHS
+#line 165 "src/cowfe/parser.y"
+
+	yylhs.yy178 := yyrhs[2].yy178;
+	var t := AllocLabel();
+	break_label := AllocLabel();
+	yyrhs[1].yy139.beq.truelabel := t;
+	yyrhs[1].yy139.beq.falselabel := break_label;
+	yyrhs[1].yy139.beq.fallthrough := t;
+	GenerateConditional(yyrhs[1].yy139);
+	yylhs.yy178.exit_label := break_label;
+
+#line 1128 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(13,&yyrhs[0]);
+end sub;
+sub reduce_10 implements Reducer is # 1 symbols on RHS
+#line 179 "src/cowfe/parser.y"
+
+	if break_label == 0 then
+		SimpleError("nothing to break to");
+	end if;
+	Generate(MidJump(break_label));
+
+#line 1139 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_11 implements Reducer is # 1 symbols on RHS
+#line 187 "src/cowfe/parser.y"
+
+	if continue_label == 0 then
+		SimpleError("nothing to continue to");
+	end if;
+	Generate(MidJump(continue_label));
+
+#line 1150 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_12 implements Reducer is # 7 symbols on RHS
+#line 197 "src/cowfe/parser.y"
+
+	Generate(MidLabel(current_if.exit_label));
+	var oldif := current_if;
+	current_if := current_if.next;
+	Free(oldif as [uint8]);
+
+#line 1161 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(26,&yyrhs[4]);
+  yy_destructor(10,&yyrhs[1]);
+  yy_destructor(12,&yyrhs[0]);
+end sub;
+sub reduce_13 implements Reducer is # -1 symbols on RHS
+#line 205 "src/cowfe/parser.y"
+
+	var newif := InternalAlloc(@bytesof IfLabels) as [IfLabels];
+	newif.next := current_if;
+	current_if := newif;
+	current_if.exit_label := AllocLabel();
+
+#line 1174 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_14 implements Reducer is # 0 symbols on RHS
+#line 213 "src/cowfe/parser.y"
+
+	var t := AllocLabel();
+	var f := AllocLabel();
+	current_if.true_label := t;
+	current_if.false_label := f;
+	yyrhs[0].yy139.beq.truelabel := t;
+	yyrhs[0].yy139.beq.falselabel := f;
+	yyrhs[0].yy139.beq.fallthrough := t;
+	GenerateConditional(yyrhs[0].yy139);
+
+#line 1188 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_15 implements Reducer is # -1 symbols on RHS
+#line 225 "src/cowfe/parser.y"
+
+	Generate(MidLabel(current_if.false_label));
+
+#line 1195 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_16 implements Reducer is # 0 symbols on RHS
+#line 233 "src/cowfe/parser.y"
+
+	Generate(MidJump(current_if.exit_label));
+	Generate(MidLabel(current_if.false_label));
+
+#line 1203 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_17 implements Reducer is # 0 symbols on RHS
+#line 239 "src/cowfe/parser.y"
+
+	Generate(MidJump(current_if.exit_label));
+	Generate(MidLabel(current_if.false_label));
+
+#line 1211 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_18 implements Reducer is # 4 symbols on RHS
+#line 247 "src/cowfe/parser.y"
+
+	if (current_case.seenelse == 0) and (current_case.next_label != 0) then
+		Generate(MidLabel(current_case.next_label));
+	end if;
+	Generate(MidLabel(current_case.break_label));
+	Generate(MidEndcase(current_case.width));
+
+	var c := current_case;
+	current_case := c.old_case;
+	Free(c as [uint8]);
+
+#line 1226 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(10,&yyrhs[2]);
+  yy_destructor(64,&yyrhs[1]);
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_19 implements Reducer is # 2 symbols on RHS
+#line 260 "src/cowfe/parser.y"
+
+	var c := InternalAlloc(@bytesof CaseLabels) as [CaseLabels];
+	c.old_case := current_case;
+	c.old_break_label := break_label;
+	c.break_label := AllocLabel();
+	current_case := c;
+
+	if IsNum(yyrhs[1].yy139.type) == 0 then
+		SimpleError("case only works on numbers");
+	end if;
+
+	c.width := NodeWidth(yyrhs[1].yy139);
+	Generate(MidStartcase(c.width, yyrhs[1].yy139));
+
+#line 1247 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(65,&yyrhs[0]);
+end sub;
+sub reduce_20 implements Reducer is # 2 symbols on RHS
+#line 281 "src/cowfe/parser.y"
+
+	if current_case.seenelse != 0 then
+		SimpleError("when else must go last");
+	end if;
+
+	if current_case.next_label != 0 then
+		Generate(MidJump(current_case.break_label));
+		Generate(MidLabel(current_case.next_label));
+	end if;
+	current_case.next_label := AllocLabel();
+
+	Generate(MidWhencase(current_case.width, yyrhs[1].yy129, current_case.next_label));
+
+#line 1265 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(6,&yyrhs[0]);
+end sub;
+sub reduce_21 implements Reducer is # 2 symbols on RHS
+#line 296 "src/cowfe/parser.y"
+
+	if current_case.seenelse != 0 then
+		SimpleError("only one when else allowed");
+	end if;
+	if current_case.next_label != 0 then
+		Generate(MidJump(current_case.break_label));
+		Generate(MidLabel(current_case.next_label));
+	end if;
+	current_case.next_label := 0;
+
+	current_case.seenelse := 1;
+
+#line 1282 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(9,&yyrhs[1]);
+  yy_destructor(6,&yyrhs[0]);
+end sub;
+sub reduce_22 implements Reducer is # 2 symbols on RHS
+#line 313 "src/cowfe/parser.y"
+
+	yylhs.yy139 := yyrhs[1].yy139;
+
+#line 1291 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(4,&yyrhs[0]);
+end sub;
+sub reduce_23 implements Reducer is # 1 symbols on RHS
+#line 325 "src/cowfe/parser.y"
+
+	yylhs.yy139 := yyrhs[0].yy139;
+	Negate(yyrhs[0].yy139);
+
+#line 1300 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_24 implements Reducer is # 2 symbols on RHS
+#line 331 "src/cowfe/parser.y"
+
+	yylhs.yy139 := MidBand(yyrhs[2].yy139, yyrhs[0].yy139, 0, 0, 0, 0);
+
+#line 1307 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(46,&yyrhs[1]);
+end sub;
+sub reduce_25 implements Reducer is # 2 symbols on RHS
+#line 336 "src/cowfe/parser.y"
+
+	yylhs.yy139 := MidBor(yyrhs[2].yy139, yyrhs[0].yy139, 0, 0, 0, 0);
+
+#line 1315 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(47,&yyrhs[1]);
+end sub;
+sub reduce_26 implements Reducer is # 2 symbols on RHS
+#line 366 "src/cowfe/parser.y"
+
+	yylhs.yy139 := ConditionalEq(yyrhs[2].yy139, yyrhs[0].yy139, 0);
+
+#line 1323 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(54,&yyrhs[1]);
+end sub;
+sub reduce_27 implements Reducer is # 2 symbols on RHS
+#line 371 "src/cowfe/parser.y"
+
+	yylhs.yy139 := ConditionalEq(yyrhs[2].yy139, yyrhs[0].yy139, 1);
+
+#line 1331 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(55,&yyrhs[1]);
+end sub;
+sub reduce_28 implements Reducer is # 2 symbols on RHS
+#line 376 "src/cowfe/parser.y"
+
+	yylhs.yy139 := ConditionalLt(yyrhs[2].yy139, yyrhs[0].yy139, 0);
+
+#line 1339 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(50,&yyrhs[1]);
+end sub;
+sub reduce_29 implements Reducer is # 2 symbols on RHS
+#line 381 "src/cowfe/parser.y"
+
+	yylhs.yy139 := ConditionalLt(yyrhs[2].yy139, yyrhs[0].yy139, 1);
+
+#line 1347 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(53,&yyrhs[1]);
+end sub;
+sub reduce_30 implements Reducer is # 2 symbols on RHS
+#line 386 "src/cowfe/parser.y"
+
+	yylhs.yy139 := ConditionalLt(yyrhs[0].yy139, yyrhs[2].yy139, 0);
+
+#line 1355 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(52,&yyrhs[1]);
+end sub;
+sub reduce_31 implements Reducer is # 2 symbols on RHS
+#line 391 "src/cowfe/parser.y"
+
+	yylhs.yy139 := ConditionalLt(yyrhs[0].yy139, yyrhs[2].yy139, 1);
+
+#line 1363 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(51,&yyrhs[1]);
+end sub;
+sub reduce_32 implements Reducer is # 0 symbols on RHS
+#line 398 "src/cowfe/parser.y"
+ yylhs.yy139 := MidConstant(yyrhs[0].yy0.number); 
+#line 1369 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_33 implements Reducer is # 2 symbols on RHS
+#line 399 "src/cowfe/parser.y"
+ yylhs.yy139 := yyrhs[1].yy139; 
+#line 1374 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(4,&yyrhs[0]);
+end sub;
+sub reduce_34 implements Reducer is # 0 symbols on RHS
+#line 402 "src/cowfe/parser.y"
+ yylhs.yy139 := yyrhs[0].yy139; 
+#line 1380 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_35 implements Reducer is # 1 symbols on RHS
+#line 403 "src/cowfe/parser.y"
+ yylhs.yy139 := Expr1Simple(MIDCODE_NEG0, yyrhs[0].yy139); 
+#line 1385 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_36 implements Reducer is # 1 symbols on RHS
+#line 404 "src/cowfe/parser.y"
+ yylhs.yy139 := Expr1Simple(MIDCODE_NOT0, yyrhs[0].yy139); 
+#line 1390 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_37 implements Reducer is # 2 symbols on RHS
+#line 405 "src/cowfe/parser.y"
+ yylhs.yy139 := ExprAdd(yyrhs[2].yy139, yyrhs[0].yy139); 
+#line 1395 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(19,&yyrhs[1]);
+end sub;
+sub reduce_38 implements Reducer is # 2 symbols on RHS
+#line 406 "src/cowfe/parser.y"
+ yylhs.yy139 := ExprSub(yyrhs[2].yy139, yyrhs[0].yy139); 
+#line 1401 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(14,&yyrhs[1]);
+end sub;
+sub reduce_39 implements Reducer is # 2 symbols on RHS
+#line 407 "src/cowfe/parser.y"
+ yylhs.yy139 := Expr2Simple(MIDCODE_MUL0, MIDCODE_MUL0, yyrhs[2].yy139, yyrhs[0].yy139); 
+#line 1407 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(24,&yyrhs[1]);
+end sub;
+sub reduce_40 implements Reducer is # 2 symbols on RHS
+#line 408 "src/cowfe/parser.y"
+ yylhs.yy139 := Expr2Simple(MIDCODE_DIVS0, MIDCODE_DIVU0, yyrhs[2].yy139, yyrhs[0].yy139); 
+#line 1413 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(23,&yyrhs[1]);
+end sub;
+sub reduce_41 implements Reducer is # 2 symbols on RHS
+#line 409 "src/cowfe/parser.y"
+ yylhs.yy139 := Expr2Simple(MIDCODE_REMS0, MIDCODE_REMU0, yyrhs[2].yy139, yyrhs[0].yy139); 
+#line 1419 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(18,&yyrhs[1]);
+end sub;
+sub reduce_42 implements Reducer is # 2 symbols on RHS
+#line 410 "src/cowfe/parser.y"
+ yylhs.yy139 := Expr2Simple(MIDCODE_EOR0, MIDCODE_EOR0, yyrhs[2].yy139, yyrhs[0].yy139); 
+#line 1425 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(49,&yyrhs[1]);
+end sub;
+sub reduce_43 implements Reducer is # 2 symbols on RHS
+#line 411 "src/cowfe/parser.y"
+ yylhs.yy139 := Expr2Simple(MIDCODE_AND0, MIDCODE_AND0, yyrhs[2].yy139, yyrhs[0].yy139); 
+#line 1431 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(59,&yyrhs[1]);
+end sub;
+sub reduce_44 implements Reducer is # 2 symbols on RHS
+#line 412 "src/cowfe/parser.y"
+ yylhs.yy139 := Expr2Simple(MIDCODE_OR0, MIDCODE_OR0, yyrhs[2].yy139, yyrhs[0].yy139); 
+#line 1437 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(48,&yyrhs[1]);
+end sub;
+sub reduce_45 implements Reducer is # 2 symbols on RHS
+#line 413 "src/cowfe/parser.y"
+ yylhs.yy139 := ExprShift(MIDCODE_LSHIFT0, MIDCODE_LSHIFT0, yyrhs[2].yy139, yyrhs[0].yy139); 
+#line 1443 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(56,&yyrhs[1]);
+end sub;
+sub reduce_46 implements Reducer is # 2 symbols on RHS
+#line 414 "src/cowfe/parser.y"
+ yylhs.yy139 := ExprShift(MIDCODE_RSHIFTS0, MIDCODE_RSHIFTU0, yyrhs[2].yy139, yyrhs[0].yy139); 
+#line 1449 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(57,&yyrhs[1]);
+end sub;
+sub reduce_47 implements Reducer is # 2 symbols on RHS
+#line 417 "src/cowfe/parser.y"
+
+	CheckNotPartialType(yyrhs[0].yy79);
+	if (yyrhs[2].yy139.op != MIDCODE_CONSTANT) and (yyrhs[2].yy139.type.width != yyrhs[0].yy79.width) then
+		if (IsPtr(yyrhs[2].yy139.type) != 0) or (IsPtr(yyrhs[0].yy79) != 0) then
+			SimpleError("cast between pointer and non-pointer of different size");
+		end if;
+
+		yylhs.yy139 := MidCCast(yyrhs[0].yy79.width as uint8, yyrhs[2].yy139, IsSNum(yyrhs[2].yy139.type));
+	else
+		yylhs.yy139 := yyrhs[2].yy139;
+	end if;
+	yylhs.yy139.type := yyrhs[0].yy79;
+
+#line 1467 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(58,&yyrhs[1]);
+end sub;
+sub reduce_48 implements Reducer is # 1 symbols on RHS
+#line 432 "src/cowfe/parser.y"
+
+	yylhs.yy139 := UndoLValue(yyrhs[0].yy139);
+	if yylhs.yy139.op == MIDCODE_ADDRESS then
+		var sym := yylhs.yy139.address.sym;
+		if IsScalar(sym.vardata.type) != 0 then
+			SimpleError("you cannot take the address of scalar variables");
+		end if;
+	end if;
+
+#line 1481 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_49 implements Reducer is # 2 symbols on RHS
+#line 443 "src/cowfe/parser.y"
+
+	yylhs.yy139 := UndoLValue(yyrhs[0].yy139);
+
+#line 1488 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(59,&yyrhs[1]);
+end sub;
+sub reduce_50 implements Reducer is # 1 symbols on RHS
+#line 455 "src/cowfe/parser.y"
+
+	if IsPtr(yyrhs[0].yy139.type) == 0 then
+		parser_i_bad_next_prev();
+	end if;
+	yylhs.yy139 := MidC2Op(MIDCODE_ADD0,
+		intptr_type.width as uint8,
+		yyrhs[0].yy139,
+		MidConstant(yyrhs[0].yy139.type.pointertype.element.stride as Arith)
+	);
+	yylhs.yy139.type := yyrhs[0].yy139.type;
+
+#line 1504 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_51 implements Reducer is # 1 symbols on RHS
+#line 468 "src/cowfe/parser.y"
+
+	if IsPtr(yyrhs[0].yy139.type) == 0 then
+		parser_i_bad_next_prev();
+	end if;
+	yylhs.yy139 := MidC2Op(MIDCODE_SUB0,
+		intptr_type.width as uint8,
+		yyrhs[0].yy139,
+		MidConstant(yyrhs[0].yy139.type.pointertype.element.stride as Arith)
+	);
+	yylhs.yy139.type := yyrhs[0].yy139.type;
+
+#line 1519 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_52 implements Reducer is # 1 symbols on RHS
+#line 481 "src/cowfe/parser.y"
+
+	yylhs.yy139 := MidConstant(yyrhs[0].yy79.width as Arith);
+
+#line 1526 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_53 implements Reducer is # 1 symbols on RHS
+#line 486 "src/cowfe/parser.y"
+
+	if IsArray(yyrhs[0].yy79) == 0 then
+		SimpleError("array expected");
+	end if;
+	yylhs.yy139 := MidConstant(yyrhs[0].yy79.arraytype.size as Arith);
+
+#line 1536 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_54 implements Reducer is # 0 symbols on RHS
+#line 494 "src/cowfe/parser.y"
+
+	sub not_a_value() is
+		StartError();
+		print(yyrhs[0].yy143.name);
+		print(" is not a value");
+		EndError();
+	end sub;
+
+	case yyrhs[0].yy143.kind is
+		when CONST:
+			yylhs.yy139 := MidConstant(yyrhs[0].yy143.constant);
+
+		when VAR:
+			yylhs.yy139 := MidAddress(yyrhs[0].yy143, 0);
+			yylhs.yy139.type := MakePointerType(yyrhs[0].yy143.vardata.type);
+			yylhs.yy139 := MakeLValue(yylhs.yy139);
+
+		when TYPE:
+			# Subroutine instances are passed around as their type, even if it
+			# does not *really* make sense. Every type must have a symbol, so
+			# by using the type as a subroutine literal, we save on having to
+			# create an extra symbol for it.
+			if yyrhs[0].yy143.typedata.kind == TYPE_SUBROUTINE then
+				yylhs.yy139 := MidSubref(yyrhs[0].yy143.typedata.subrtype.subr);
+				yylhs.yy139.type := yyrhs[0].yy143.typedata.subrtype.subr.intfsubr.type;
+			else
+				not_a_value();
+			end if;
+
+		when else:
+			not_a_value();
+	end case;
+
+#line 1573 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_55 implements Reducer is # 2 symbols on RHS
+#line 529 "src/cowfe/parser.y"
+
+	if IsPtr(yyrhs[1].yy139.type) == 0 then
+		SimpleError("cannot dereference non-pointers");
+	end if;
+
+	yylhs.yy139 := MakeLValue(yyrhs[1].yy139);
+
+#line 1584 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(5,&yyrhs[0]);
+end sub;
+sub reduce_56 implements Reducer is # 3 symbols on RHS
+#line 538 "src/cowfe/parser.y"
+
+	var type := yyrhs[3].yy139.type;
+	var address := MaybeUndoLValue(yyrhs[3].yy139);
+
+	if IsArray(type) == 0 then
+		StartError();
+		print("you can only index an array, not a ");
+		print(type.symbol.name);
+		EndError();
+	end if;
+
+	CheckExpressionType(yyrhs[1].yy139, type.arraytype.indextype);
+	if IsNum(yyrhs[1].yy139.type) == 0 then
+		SimpleError("array indices must be numbers");
+	end if;
+
+	var elementtype := type.arraytype.element;
+	var w := intptr_type.width as uint8;
+
+	var displacement := MidC2Op(MIDCODE_MUL0, w,
+				MidCCast(intptr_type.width as uint8, yyrhs[1].yy139, 0),
+				MidConstant(elementtype.stride as int32));
+	displacement.type := intptr_type;
+
+	var adjustedaddress := MidC2Op(MIDCODE_ADD0, w, address, displacement);
+	adjustedaddress.type := MakePointerType(elementtype);
+	yylhs.yy139 := MakeLValue(adjustedaddress);
+
+#line 1617 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(17,&yyrhs[2]);
+  yy_destructor(5,&yyrhs[0]);
+end sub;
+sub reduce_57 implements Reducer is # 2 symbols on RHS
+#line 568 "src/cowfe/parser.y"
+
+	var type := yyrhs[2].yy139.type;
+	var address := yyrhs[2].yy139;
+
+	sub BadType() is
+		StartError();
+		print(type.symbol.name);
+		print(" is not a record or pointer to a record");
+		EndError();
+	end sub;
+
+	if IsLValue(address) != 0 then
+		address := MaybeUndoLValue(yyrhs[2].yy139);
+
+		# Dereference pointers.
+
+		while IsPtr(type) != 0 loop
+			type := type.pointertype.element;
+			CheckNotPartialType(type);
+			address := MidDeref(intptr_type.width as uint8, address);
+		end loop;
+	elseif IsPtr(type) != 0 then
+		type := type.pointertype.element;
+	else
+		BadType();
+	end if;
+	CheckNotPartialType(type);
+
+	if IsRecord(type) == 0 then
+		BadType();
+	end if;
+
+	var member := LookupSymbol(&type.recordtype.namespace, yyrhs[0].yy0.string);
+	if member == (0 as [Symbol]) then
+		StartError();
+		print(type.symbol.name);
+		print(" does not contain a member '");
+		print(yyrhs[0].yy0.string);
+		print("'");
+		EndError();
+	end if;
+	Free(yyrhs[0].yy0.string as [uint8]);
+
+	yylhs.yy139 := MidC2Op(MIDCODE_ADD0,
+		intptr_type.width as uint8,
+		address, MidConstant(member.vardata.offset as Arith));
+	yylhs.yy139.type := MakePointerType(member.vardata.type);
+	yylhs.yy139 := MakeLValue(yylhs.yy139);
+
+#line 1672 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(8,&yyrhs[1]);
+end sub;
+sub reduce_58 implements Reducer is # 0 symbols on RHS
+#line 619 "src/cowfe/parser.y"
+
+	# consumes yyrhs[0].yy0
+	yylhs.yy139 := MidString(yyrhs[0].yy0.string);
+	yylhs.yy139.type := MakePointerType(uint8_type);
+
+#line 1682 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_59 implements Reducer is # 0 symbols on RHS
+#line 634 "src/cowfe/parser.y"
+
+	if yyrhs[0].yy139.op != MIDCODE_CONSTANT then
+		parser_i_constant_error();
+	end if;
+	yylhs.yy129 := yyrhs[0].yy139.constant.value;
+	Discard(yyrhs[0].yy139);
+
+#line 1693 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_60 implements Reducer is # 4 symbols on RHS
+#line 643 "src/cowfe/parser.y"
+
+	yyrhs[3].yy143.kind := CONST;
+	yyrhs[3].yy143.constant := yyrhs[1].yy129;
+
+#line 1701 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(2,&yyrhs[2]);
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_61 implements Reducer is # 5 symbols on RHS
+#line 652 "src/cowfe/parser.y"
+
+	if yyrhs[1].yy129 <= yyrhs[3].yy129 then
+		SimpleError("invalid integer type range");
+	end if;
+	yylhs.yy79 := ArchGuessIntType(yyrhs[3].yy129, yyrhs[1].yy129);
+
+#line 1713 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(16,&yyrhs[4]);
+  yy_destructor(45,&yyrhs[2]);
+  yy_destructor(4,&yyrhs[0]);
+end sub;
+sub reduce_62 implements Reducer is # 0 symbols on RHS
+#line 660 "src/cowfe/parser.y"
+
+	var sym := yyrhs[0].yy143;
+	if sym.kind == 0 then
+		# Create a partial type.
+		var type := AllocNewType();
+		type.kind := TYPE_PARTIAL;
+
+		sym.kind := TYPE;
+		sym.typedata := type;
+		type.symbol := sym;
+	end if;
+	if sym.kind != TYPE then
+		StartError();
+		print("expected ");
+		print(sym.name);
+		print(" to be a type");
+		EndError();
+	end if;
+	yylhs.yy79 := sym.typedata;
+
+#line 1740 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_63 implements Reducer is # 2 symbols on RHS
+#line 682 "src/cowfe/parser.y"
+
+	yylhs.yy79 := MakePointerType(yyrhs[1].yy79);
+
+#line 1747 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(5,&yyrhs[0]);
+end sub;
+sub reduce_64 implements Reducer is # 3 symbols on RHS
+#line 687 "src/cowfe/parser.y"
+
+	yylhs.yy79 := MakeArrayType(yyrhs[3].yy79, yyrhs[1].yy129 as uint16);
+
+#line 1755 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(17,&yyrhs[2]);
+  yy_destructor(5,&yyrhs[0]);
+end sub;
+sub reduce_65 implements Reducer is # 2 symbols on RHS
+#line 692 "src/cowfe/parser.y"
+
+	yylhs.yy79 := MakeArrayType(yyrhs[2].yy79, 0);
+
+#line 1764 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(17,&yyrhs[1]);
+  yy_destructor(5,&yyrhs[0]);
+end sub;
+sub reduce_66 implements Reducer is # 1 symbols on RHS
+#line 697 "src/cowfe/parser.y"
+
+	if IsArray(yyrhs[0].yy79) == 0 then
+		StartError();
+		print(yyrhs[0].yy79.symbol.name);
+		print(" is not an array");
+		EndError();
+	end if;
+
+	yylhs.yy79 := yyrhs[0].yy79.arraytype.indextype;
+
+#line 1780 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_67 implements Reducer is # 4 symbols on RHS
+#line 709 "src/cowfe/parser.y"
+
+	# consumes yyrhs[3].yy0
+	var sym := AddAlias(0 as [Namespace], yyrhs[3].yy0.string, yyrhs[1].yy79.symbol);
+
+#line 1788 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(65,&yyrhs[2]);
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_68 implements Reducer is # 0 symbols on RHS
+#line 718 "src/cowfe/parser.y"
+
+	# consumes X
+	yylhs.yy143 := AddSymbol(0 as [Namespace], yyrhs[0].yy0.string);
+
+#line 1798 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_69 implements Reducer is # 0 symbols on RHS
+#line 725 "src/cowfe/parser.y"
+
+	var name := yyrhs[0].yy0.string;
+	var sym := LookupSymbol(0 as [Namespace], name);
+	if sym == (0 as [Symbol]) then
+		StartError();
+		print("symbol '");
+		print(name);
+		print("' not found");
+		EndError();
+	end if;
+	Free(name);
+	yylhs.yy143 := sym;
+
+#line 1815 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_70 implements Reducer is # 0 symbols on RHS
+#line 741 "src/cowfe/parser.y"
+
+	var name := yyrhs[0].yy0.string;
+	var sym := LookupSymbol(0 as [Namespace], name);
+	if sym == (0 as [Symbol]) then
+		sym := AddSymbol(0 as [Namespace], name);
+	else
+		Free(name);
+	end if;
+	yylhs.yy143 := sym;
+
+#line 1829 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_71 implements Reducer is # 0 symbols on RHS
+#line 754 "src/cowfe/parser.y"
+
+	case yyrhs[0].yy143.kind is
+		when VAR:
+			yylhs.yy79 := yyrhs[0].yy143.vardata.type;
+
+		when TYPE:
+			yylhs.yy79 := yyrhs[0].yy143.typedata;
+
+		when else:
+			SimpleError("simple type or variable name expected");
+	end case;
+
+#line 1845 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_72 implements Reducer is # 2 symbols on RHS
+#line 768 "src/cowfe/parser.y"
+
+	yylhs.yy79 := yyrhs[1].yy79;
+
+#line 1852 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(4,&yyrhs[0]);
+end sub;
+sub reduce_73 implements Reducer is # 1 symbols on RHS
+#line 799 "src/cowfe/parser.y"
+
+	var intfsubr := current_call.intfsubr;
+	current_call.num_output_args := 1;
+	i_check_sub_call_args();
+	if intfsubr.num_output_parameters != 1 then
+		SimpleError("subroutines called as functions must have exactly one output parameter");
+	end if;
+
+	var param := GetOutputParameter(intfsubr, 0);
+	var w := param.vardata.type.width as uint8;
+	var temp := AddSymbol(&current_subr.namespace, 0 as string);
+	InitVariable(current_subr, temp, param.vardata.type);
+
+	Generate(MidCall(yyrhs[0].yy139, current_call.expr, intfsubr));
+    Generate(MidStore(w, MidPoparg(w, intfsubr, param, 0), MidDeref(w, MidAddress(temp, 0))));
+
+	i_end_call();
+
+	yylhs.yy139 := MidDeref(w, MidAddress(temp, 0));
+	yylhs.yy139.type := param.vardata.type;
+
+#line 1878 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_74 implements Reducer is # 2 symbols on RHS
+#line 822 "src/cowfe/parser.y"
+
+	var intfsubr := current_call.intfsubr;
+	i_check_sub_call_args();
+	if intfsubr.num_output_parameters != 0 then
+		SimpleError("subroutine requires output arguments");
+	end if;
+
+	Generate(MidCall(yyrhs[1].yy139, current_call.expr, intfsubr));
+
+	i_end_call();
+
+#line 1893 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_75 implements Reducer is # 4 symbols on RHS
+#line 835 "src/cowfe/parser.y"
+
+	var intfsubr := current_call.intfsubr;
+	i_check_sub_call_args();
+
+	Generate(MidCall(yyrhs[1].yy139, current_call.expr, intfsubr));
+
+	var paramindex := intfsubr.num_output_parameters;
+	var count: uint8 := 0;
+	var node := yyrhs[4].yy139;
+	while node != (0 as [Node]) loop
+		if paramindex == 0 then
+			SimpleError("too many output arguments");
+		end if;
+
+		paramindex := paramindex - 1;
+		var param := GetOutputParameter(intfsubr, paramindex);
+
+		var arg := node.left;
+		node.left := (0 as [Node]);
+		node := node.right;
+
+		if IsPtr(arg.type) == 0 then
+			SimpleError("you can only assign to lvalues");
+		end if;
+
+		CheckExpressionType(arg, MakePointerType(param.vardata.type));
+		CheckNotPartialType(param.vardata.type);
+		CheckNotPartialType(arg.type);
+
+		var w := param.vardata.type.width as uint8;
+		Generate(
+			MidStore(
+				w,
+				MidPoparg(w, intfsubr, param, count),
+				MidDeref(w, arg)
+			)
+		);
+
+		count := count + 1;
+		param := param.vardata.next_parameter;
+	end loop;
+	Discard(yyrhs[4].yy139);
+
+	if count != intfsubr.num_output_parameters then
+		SimpleError("too few output arguments");
+	end if;
+
+	i_end_call();
+
+#line 1947 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(2,&yyrhs[3]);
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_76 implements Reducer is # 0 symbols on RHS
+#line 886 "src/cowfe/parser.y"
+
+	if IsSubroutine(yyrhs[0].yy139.type) == 0 then
+		StartError();
+		print("expected ");
+		print(yyrhs[0].yy139.type.symbol.name);
+		print(" to be a subroutine");
+		EndError();
+	end if;
+
+	var call := InternalAlloc(@bytesof SubroutineCall) as [SubroutineCall];
+	call.parent := current_call;
+	var subr := yyrhs[0].yy139.type.subrtype.subr;
+	call.expr := yyrhs[0].yy139;
+	call.intfsubr := subr;
+	call.input_parameter := GetInputParameter(subr, 0);
+	call.output_parameter := GetOutputParameter(subr, 0);
+	current_call := call;
+
+#line 1971 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_77 implements Reducer is # 2 symbols on RHS
+#line 912 "src/cowfe/parser.y"
+ yylhs.yy139 := yyrhs[1].yy139; 
+#line 1976 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(4,&yyrhs[0]);
+end sub;
+sub reduce_78 implements Reducer is # 1 symbols on RHS
+#line 915 "src/cowfe/parser.y"
+ yylhs.yy139 := MidEnd(); 
+#line 1982 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(4,&yyrhs[0]);
+end sub;
+sub reduce_79 implements Reducer is # 0 symbols on RHS
+#line 919 "src/cowfe/parser.y"
+ yylhs.yy139 := yyrhs[0].yy139; 
+#line 1988 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_80 implements Reducer is # 2 symbols on RHS
+#line 922 "src/cowfe/parser.y"
+
+	Discard(yyrhs[0].yy139.left);
+	yyrhs[0].yy139.left := yyrhs[2].yy139;
+	yylhs.yy139 := yyrhs[0].yy139;
+
+#line 1997 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(45,&yyrhs[1]);
+end sub;
+sub reduce_81 implements Reducer is # 0 symbols on RHS
+#line 930 "src/cowfe/parser.y"
+
+	var param := current_call.input_parameter;
+	if param == (0 as [Symbol]) then
+		StartError();
+		print("too many parameters in call to ");
+		print(current_call.intfsubr.symbol.name);
+		EndError();
+	end if;
+
+	current_call.input_parameter := current_call.input_parameter.vardata.next_parameter;
+	CheckExpressionType(yyrhs[0].yy139, param.vardata.type);
+	CheckNotPartialType(param.vardata.type);
+	CheckNotPartialType(yyrhs[0].yy139.type);
+	current_call.num_input_args := current_call.num_input_args + 1;
+	yylhs.yy139 := MidArg(NodeWidth(yyrhs[0].yy139), MidEnd(), yyrhs[0].yy139,
+		current_call.intfsubr,
+		param,
+		current_call.intfsubr.num_input_parameters - current_call.num_input_args);
+
+#line 2021 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_82 implements Reducer is # 4 symbols on RHS
+#line 961 "src/cowfe/parser.y"
+
+	yylhs.yy139 := MidPair(yyrhs[1].yy139, yyrhs[3].yy139);
+
+#line 2028 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(45,&yyrhs[2]);
+  yy_destructor(4,&yyrhs[0]);
+end sub;
+sub reduce_83 implements Reducer is # 0 symbols on RHS
+#line 967 "src/cowfe/parser.y"
+
+	yylhs.yy139 := MidPair(yyrhs[0].yy139, 0 as [Node]);
+
+#line 2037 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_84 implements Reducer is # 2 symbols on RHS
+#line 972 "src/cowfe/parser.y"
+
+	yylhs.yy139 := MidPair(yyrhs[0].yy139, yyrhs[2].yy139);
+
+#line 2044 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(45,&yyrhs[1]);
+end sub;
+sub reduce_85 implements Reducer is # 0 symbols on RHS
+#line 978 "src/cowfe/parser.y"
+
+	yylhs.yy139 := UndoLValue(yyrhs[0].yy139);
+
+#line 2052 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_86 implements Reducer is # 4 symbols on RHS
+#line 1000 "src/cowfe/parser.y"
+
+	preparing_subr.flags := preparing_subr.flags | SUB_IS_INTERFACE;
+	EmitterEmitSubroutineFlags(preparing_subr);
+
+	current_subr := preparing_subr;
+	Generate(MidStartsub(current_subr));
+	Generate(MidEndsub(current_subr));
+	ReportWorkspaces(current_subr);
+
+	current_subr := current_subr.parent;
+
+#line 2067 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_87 implements Reducer is # 3 symbols on RHS
+#line 1016 "src/cowfe/parser.y"
+
+	sub not_an_interface() is
+		SimpleError("type is not an interface");
+	end sub;
+
+	if IsSubroutine(yyrhs[0].yy79) == 0 then
+		not_an_interface();
+	end if;
+	var intfsubr := yyrhs[0].yy79.subrtype.subr;
+	if (intfsubr.flags & SUB_IS_INTERFACE) == 0 then
+		not_an_interface();
+	end if;
+
+	preparing_subr.flags := preparing_subr.flags | SUB_IS_IMPLEMENTATION;
+	preparing_subr.intfsubr := intfsubr;
+	preparing_subr.type := yyrhs[0].yy79;
+	EmitterReferenceSubroutine(current_subr, intfsubr);
+	EmitterReferenceSubroutine(intfsubr, preparing_subr);
+
+	preparing_subr.num_input_parameters := intfsubr.num_input_parameters;
+	if preparing_subr.num_input_parameters != 0 then
+		CopyParameterList(intfsubr.namespace.first, preparing_subr);
+	end if;
+
+	preparing_subr.num_output_parameters := intfsubr.num_output_parameters;
+	if preparing_subr.num_output_parameters != 0 then
+		CopyParameterList(GetOutputParameter(intfsubr, 0), preparing_subr);
+	end if;
+
+	EmitterEmitInputParameters(preparing_subr);
+	EmitterEmitOutputParameters(preparing_subr);
+	EmitterEmitSubroutineFlags(preparing_subr);
+
+#line 2105 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(68,&yyrhs[1]);
+end sub;
+sub reduce_88 implements Reducer is # 4 symbols on RHS
+#line 1053 "src/cowfe/parser.y"
+
+	EmitterDeclareExternalSubroutine(preparing_subr.id, yyrhs[1].yy0.string);
+
+#line 2113 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(11,&yyrhs[3]);
+  yy_destructor(16,&yyrhs[2]);
+  yy_destructor(4,&yyrhs[0]);
+end sub;
+sub reduce_89 implements Reducer is # 0 symbols on RHS
+#line 1059 "src/cowfe/parser.y"
+
+	preparing_subr := InternalAlloc(@bytesof Subroutine) as [Subroutine];
+	preparing_subr.namespace.parent := &current_subr.namespace;
+	preparing_subr.parent := current_subr;
+	preparing_subr.id := AllocSubrId();
+
+	var type := AllocNewType();
+	type.kind := TYPE_SUBROUTINE;
+	type.width := intptr_type.width;
+	type.alignment := intptr_type.alignment;
+	type.stride := intptr_type.stride;
+	type.subrtype.subr := preparing_subr;
+	preparing_subr.type := type;
+	preparing_subr.intfsubr := preparing_subr;
+
+	yyrhs[0].yy143.kind := TYPE;
+	yyrhs[0].yy143.typedata := type;
+	type.symbol := yyrhs[0].yy143;
+	preparing_subr.symbol := yyrhs[0].yy143;
+
+	EmitterDeclareSubroutine(preparing_subr);
+	yylhs.yy143 := yyrhs[0].yy143;
+
+#line 2143 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_90 implements Reducer is # 2 symbols on RHS
+#line 1084 "src/cowfe/parser.y"
+
+	if (yyrhs[0].yy143.kind != TYPE) or (IsSubroutine(yyrhs[0].yy143.typedata) == 0) then
+		SimpleError("not a subroutine");
+	end if;
+	preparing_subr := yyrhs[0].yy143.typedata.subrtype.subr;
+
+	if (preparing_subr.flags & SUB_HAS_IMPL) != 0 then
+		SimpleError("subroutine already implemented");
+	end if;
+	if preparing_subr.parent != current_subr then
+		SimpleError("cannot implement subroutine here");
+	end if;
+
+#line 2160 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(25,&yyrhs[1]);
+end sub;
+sub reduce_91 implements Reducer is # 0 symbols on RHS
+#line 1099 "src/cowfe/parser.y"
+
+	var sl := InternalAlloc(@bytesof SubroutineLabels) as [SubroutineLabels];
+	sl.old_labels := current_subr_def;
+	sl.old_break_label := break_label;
+	break_label := 0;
+	sl.old_continue_label := continue_label;
+	continue_label := 0;
+	current_subr_def := sl;
+
+	current_subr := preparing_subr;
+	Generate(MidStartsub(current_subr));
+	current_subr.flags := current_subr.flags | SUB_HAS_IMPL;
+
+#line 2178 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_92 implements Reducer is # 1 symbols on RHS
+#line 1114 "src/cowfe/parser.y"
+
+	Generate(MidEndsub(current_subr));
+
+	ReportWorkspaces(current_subr);
+	break_label := current_subr_def.old_break_label;
+	continue_label := current_subr_def.old_continue_label;
+	var ll := current_subr_def;
+	current_subr_def := ll.old_labels;
+	Free(ll as [uint8]);
+
+	var subr := current_subr;
+	current_subr := subr.parent;
+
+	DestructSubroutineContents(subr);
+
+#line 2197 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(25,&yyrhs[0]);
+end sub;
+sub reduce_93 implements Reducer is # 0 symbols on RHS
+#line 1131 "src/cowfe/parser.y"
+
+	preparing_subr.num_output_parameters := 0;
+
+	EmitterEmitInputParameters(preparing_subr);
+	EmitterEmitOutputParameters(preparing_subr);
+
+#line 2208 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_94 implements Reducer is # 2 symbols on RHS
+#line 1139 "src/cowfe/parser.y"
+
+	preparing_subr.num_output_parameters := CountParameters(yyrhs[0].yy143);
+
+	EmitterEmitInputParameters(preparing_subr);
+	EmitterEmitOutputParameters(preparing_subr);
+
+#line 2218 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(6,&yyrhs[1]);
+end sub;
+sub reduce_95 implements Reducer is # 0 symbols on RHS
+#line 1147 "src/cowfe/parser.y"
+
+	preparing_subr.num_input_parameters := CountParameters(yyrhs[0].yy143);
+
+#line 2226 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_96 implements Reducer is # 1 symbols on RHS
+#line 1153 "src/cowfe/parser.y"
+
+	yylhs.yy143 := 0 as [Symbol];
+
+#line 2233 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(4,&yyrhs[0]);
+end sub;
+sub reduce_97 implements Reducer is # 2 symbols on RHS
+#line 1158 "src/cowfe/parser.y"
+
+	yylhs.yy143 := yyrhs[1].yy143;
+
+#line 2241 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(4,&yyrhs[0]);
+end sub;
+sub reduce_98 implements Reducer is # 0 symbols on RHS
+#line 1164 "src/cowfe/parser.y"
+
+	yylhs.yy143 := yyrhs[0].yy143;
+
+#line 2249 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_99 implements Reducer is # 2 symbols on RHS
+#line 1169 "src/cowfe/parser.y"
+
+	yyrhs[2].yy143.vardata.next_parameter := yyrhs[0].yy143;
+	yylhs.yy143 := yyrhs[2].yy143;
+
+#line 2257 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(45,&yyrhs[1]);
+end sub;
+sub reduce_100 implements Reducer is # 2 symbols on RHS
+#line 1176 "src/cowfe/parser.y"
+
+	# consumes yyrhs[2].yy0
+	yylhs.yy143 := AddSymbol(&preparing_subr.namespace, yyrhs[2].yy0.string);
+
+	InitVariable(preparing_subr, yylhs.yy143, yyrhs[0].yy79);
+
+#line 2268 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(6,&yyrhs[1]);
+end sub;
+sub reduce_101 implements Reducer is # 6 symbols on RHS
+#line 1196 "src/cowfe/parser.y"
+
+	current_type.stride := ArchAlignUp(current_type.width, current_type.alignment);
+
+#line 2276 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(65,&yyrhs[3]);
+  yy_destructor(10,&yyrhs[1]);
+  yy_destructor(20,&yyrhs[0]);
+end sub;
+sub reduce_102 implements Reducer is # 0 symbols on RHS
+#line 1201 "src/cowfe/parser.y"
+
+	case yyrhs[0].yy143.kind is
+		when TYPE:
+			current_type := yyrhs[0].yy143.typedata;
+			if current_type.kind != TYPE_PARTIAL then
+				SymbolRedeclarationError();
+			end if;
+
+		when 0:
+			current_type := AllocNewType();
+			yyrhs[0].yy143.kind := TYPE;
+			yyrhs[0].yy143.typedata := current_type;
+			current_type.symbol := yyrhs[0].yy143;
+
+		when else:
+			SymbolRedeclarationError();
+	end case;
+
+	current_type.kind := TYPE_RECORD;
+
+#line 2303 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_103 implements Reducer is # 1 symbols on RHS
+#line 1225 "src/cowfe/parser.y"
+
+	CheckNotPartialType(yyrhs[0].yy79);
+	if IsRecord(yyrhs[0].yy79) == 0 then
+		StartError();
+		print(yyrhs[0].yy79.symbol.name);
+		print(" is not a record type");
+		EndError();
+	end if;
+
+	current_type.alignment := yyrhs[0].yy79.alignment;
+	current_type.width := yyrhs[0].yy79.width;
+	current_type.recordtype.namespace.parent := &yyrhs[0].yy79.recordtype.namespace;
+
+#line 2320 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_104 implements Reducer is # 4 symbols on RHS
+#line 1243 "src/cowfe/parser.y"
+
+	CheckNotPartialType(yyrhs[1].yy79);
+	if yyrhs[1].yy79.alignment > current_type.alignment then
+		current_type.alignment := yyrhs[1].yy79.alignment;
+	end if;
+	yyrhs[4].yy143.kind := VAR;
+	yyrhs[4].yy143.vardata := InternalAlloc(@bytesof VarSymbol) as [VarSymbol];
+	yyrhs[4].yy143.vardata.type := yyrhs[1].yy79;
+	ArchInitMember(current_type, yyrhs[4].yy143, yyrhs[3].yy136);
+
+#line 2334 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(6,&yyrhs[2]);
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_105 implements Reducer is # -1 symbols on RHS
+#line 1256 "src/cowfe/parser.y"
+
+	yylhs.yy136 := current_type.width;
+
+#line 2343 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_106 implements Reducer is # 3 symbols on RHS
+#line 1261 "src/cowfe/parser.y"
+
+	yylhs.yy136 := yyrhs[1].yy129 as Size;
+
+#line 2350 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(16,&yyrhs[2]);
+  yy_destructor(4,&yyrhs[0]);
+end sub;
+sub reduce_107 implements Reducer is # 0 symbols on RHS
+#line 1267 "src/cowfe/parser.y"
+
+	# consumes yyrhs[0].yy0
+	yylhs.yy143 := AddSymbol(&current_type.recordtype.namespace, yyrhs[0].yy0.string);
+	current_type.recordtype.members := current_type.recordtype.members + 1;
+
+#line 2361 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_108 implements Reducer is # 4 symbols on RHS
+#line 1363 "src/cowfe/parser.y"
+
+	CheckEndOfInitialiser();
+	Generate(MidEndinit());
+
+#line 2369 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(31,&yyrhs[3]);
+  yy_destructor(32,&yyrhs[1]);
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_109 implements Reducer is # 4 symbols on RHS
+#line 1369 "src/cowfe/parser.y"
+
+	# We don't call InitVariable() because we don't want this variable
+	# allocated to a workspace.
+
+	CheckNotPartialType(yyrhs[1].yy79);
+	yyrhs[3].yy143.kind := VAR;
+	yyrhs[3].yy143.vardata := InternalAlloc(@bytesof VarSymbol) as [VarSymbol];
+	yyrhs[3].yy143.vardata.type := yyrhs[1].yy79;
+	yyrhs[3].yy143.vardata.subr := current_subr;
+	yyrhs[3].yy143.vardata.wsid := WSID_STATIC;
+	yyrhs[3].yy143.vardata.offset := AllocLabel();
+
+	if (IsArray(yyrhs[1].yy79) == 0) and (IsRecord(yyrhs[1].yy79) == 0) then
+		SimpleError("static initialisers only work on arrays or records");
+	end if;
+	if (IsRecord(yyrhs[1].yy79) != 0) and (yyrhs[1].yy79.recordtype.namespace.parent != (0 as [Namespace])) then
+		SimpleError("you can't statically initialise an inherited record");
+	end if;
+
+	if IsRecord(yyrhs[1].yy79) != 0 then
+		current_member := yyrhs[1].yy79.recordtype.namespace.first;
+	end if;
+
+	current_type := yyrhs[1].yy79;
+	current_offset := 0;
+	current_global_offset := 0;
+
+	Generate(MidStartinit(yyrhs[3].yy143));
+
+#line 2405 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(6,&yyrhs[2]);
+  yy_destructor(2,&yyrhs[0]);
+end sub;
+sub reduce_110 implements Reducer is # 0 symbols on RHS
+#line 1405 "src/cowfe/parser.y"
+
+	var member: [Symbol];
+	var type: [Type];
+	(member, type) := GetInitedMemberChecked();
+
+	AlignTo(type.alignment);
+	var w := type.width;
+	case yyrhs[0].yy139.op is
+		when MIDCODE_CONSTANT:
+			if IsNum(type) == 0 then
+				SimpleError("initialiser must be an number");
+			end if;
+			Generate(MidInit(w as uint8, yyrhs[0].yy139.constant.value));
+
+		when MIDCODE_STRING:
+			if (IsPtr(type) == 0) or (type.pointertype.element != uint8_type) then
+				SimpleError("initialiser must be a string");
+			end if;
+			Generate(MidInitstring(yyrhs[0].yy139.string.text));
+
+		when MIDCODE_ADDRESS:
+			if type != yyrhs[0].yy139.type then
+				SimpleError("initialiser of wrong type");
+			end if;
+			Generate(MidInitaddress(yyrhs[0].yy139.address.sym, yyrhs[0].yy139.address.off));
+
+		when MIDCODE_SUBREF:
+			if type != yyrhs[0].yy139.type then
+				SimpleError("initialiser of wrong type");
+			end if;
+			Generate(MidInitsubref(yyrhs[0].yy139.subref.subr));
+
+		when else:
+			parser_i_constant_error();
+	end case;
+	Discard(yyrhs[0].yy139);
+
+	current_offset := current_offset + w;
+	current_global_offset := current_global_offset + w;
+
+#line 2451 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_111 implements Reducer is # 2 symbols on RHS
+#line 1447 "src/cowfe/parser.y"
+
+	CheckEndOfInitialiser();
+
+	current_offset := current_offset + yyrhs[2].yy154.old_current_offset;
+	current_type := yyrhs[2].yy154.old_current_type;
+	current_member := yyrhs[2].yy154.old_current_member;
+	Free(yyrhs[2].yy154 as [uint8]);
+
+#line 2463 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(32,&yyrhs[0]);
+end sub;
+sub reduce_112 implements Reducer is # 0 symbols on RHS
+#line 1458 "src/cowfe/parser.y"
+
+	var member: [Symbol];
+	var type: [Type];
+	(member, type) := GetInitedMemberChecked();
+	AlignTo(type.alignment);
+
+	yylhs.yy154 := InternalAlloc(@bytesof NestedTypeInit) as [NestedTypeInit];
+	yylhs.yy154.old_current_type := current_type;
+	yylhs.yy154.old_current_member := current_member;
+	yylhs.yy154.old_current_offset := current_offset;
+
+	current_type := type;
+	current_offset := 0;
+	if IsRecord(type) != 0 then
+		current_member := type.recordtype.namespace.first;
+	elseif IsArray(type) != 0 then
+		current_member := 0 as [Symbol];
+	else
+		SimpleError("braced initialised can only initialise arrays or records");
+	end if;
+
+#line 2489 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_113 implements Reducer is # 2 symbols on RHS
+#line 1483 "src/cowfe/parser.y"
+
+	Generate(MidAsmend());
+
+#line 2496 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_114 implements Reducer is # 0 symbols on RHS
+#line 1488 "src/cowfe/parser.y"
+
+	Generate(MidAsmstart());
+
+#line 2504 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_115 implements Reducer is # 0 symbols on RHS
+#line 1496 "src/cowfe/parser.y"
+
+	Generate(MidAsmtext(yyrhs[0].yy0.string));
+	Free(yyrhs[0].yy0.string);
+
+#line 2512 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_116 implements Reducer is # 0 symbols on RHS
+#line 1502 "src/cowfe/parser.y"
+
+	Generate(MidAsmvalue(yyrhs[0].yy0.number));
+
+#line 2519 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_117 implements Reducer is # 0 symbols on RHS
+#line 1507 "src/cowfe/parser.y"
+
+	sub bad_reference() is
+		SimpleError("you can only emit references to variables, subroutines, or constants");
+	end sub;
+
+	case yyrhs[0].yy143.kind is
+		when TYPE:
+			if IsSubroutine(yyrhs[0].yy143.typedata) != 0 then
+				EmitterReferenceSubroutine(current_subr, yyrhs[0].yy143.typedata.subrtype.subr);
+				Generate(MidAsmsubref(yyrhs[0].yy143.typedata.subrtype.subr));
+			else
+				bad_reference();
+			end if;
+
+		when VAR:
+			Generate(MidAsmsymbol(yyrhs[0].yy143));
+
+		when CONST:
+			Generate(MidAsmvalue(yyrhs[0].yy143.constant));
+
+		when else:
+			bad_reference();
+	end case;
+
+#line 2547 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+sub reduce_123 implements Reducer is # 4 symbols on RHS
+#line 230 "src/cowfe/parser.y"
+
+
+#line 2553 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(26,&yyrhs[2]);
+end sub;
+sub reduce_127 implements Reducer is # 7 symbols on RHS
+#line 990 "src/cowfe/parser.y"
+
+
+#line 2560 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_128 implements Reducer is # 5 symbols on RHS
+#line 993 "src/cowfe/parser.y"
+
+
+#line 2567 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(25,&yyrhs[4]);
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_129 implements Reducer is # 4 symbols on RHS
+#line 996 "src/cowfe/parser.y"
+
+
+#line 2575 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_130 implements Reducer is # 4 symbols on RHS
+#line 1013 "src/cowfe/parser.y"
+
+
+#line 2582 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(22,&yyrhs[0]);
+end sub;
+sub reduce_136 implements Reducer is # 2 symbols on RHS
+#line 1400 "src/cowfe/parser.y"
+
+
+#line 2589 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(45,&yyrhs[1]);
+end sub;
+sub reduce_139 implements Reducer is # 2 symbols on RHS
+#line 1493 "src/cowfe/parser.y"
+
+
+#line 2596 ".obj/src/cowfe+parser/parser.coh"
+  yy_destructor(45,&yyrhs[1]);
+end sub;
+sub reduce_default implements Reducer is
+  # (118) program ::= statements
+  # (119) statements ::=
+  # (120) statements ::= statements statement
+  # (121) statement ::= SEMICOLON
+  # (122) if_optional_else ::= if_else statements
+  # (124) whens ::=
+  # (125) whens ::= whens when
+  # (126) when ::= beginwhen statements
+  # (131) submodifiers ::=
+  # (132) recordinherits ::=
+  # (133) recordmembers ::=
+  # (134) recordmembers ::= recordmember recordmembers
+  # (135) initialisers ::= initialiser
+  # (137) initialiser ::=
+  # (138) asms ::= asm
+end sub;
+var reducers: Reducer[] := {
+	reduce_0,
+	reduce_1,
+	reduce_2,
+	reduce_3,
+	reduce_4,
+	reduce_5,
+	reduce_6,
+	reduce_7,
+	reduce_8,
+	reduce_9,
+	reduce_10,
+	reduce_11,
+	reduce_12,
+	reduce_13,
+	reduce_14,
+	reduce_15,
+	reduce_16,
+	reduce_17,
+	reduce_18,
+	reduce_19,
+	reduce_20,
+	reduce_21,
+	reduce_22,
+	reduce_23,
+	reduce_24,
+	reduce_25,
+	reduce_26,
+	reduce_27,
+	reduce_28,
+	reduce_29,
+	reduce_30,
+	reduce_31,
+	reduce_32,
+	reduce_33,
+	reduce_34,
+	reduce_35,
+	reduce_36,
+	reduce_37,
+	reduce_38,
+	reduce_39,
+	reduce_40,
+	reduce_41,
+	reduce_42,
+	reduce_43,
+	reduce_44,
+	reduce_45,
+	reduce_46,
+	reduce_47,
+	reduce_48,
+	reduce_49,
+	reduce_50,
+	reduce_51,
+	reduce_52,
+	reduce_53,
+	reduce_54,
+	reduce_55,
+	reduce_56,
+	reduce_57,
+	reduce_58,
+	reduce_59,
+	reduce_60,
+	reduce_61,
+	reduce_62,
+	reduce_63,
+	reduce_64,
+	reduce_65,
+	reduce_66,
+	reduce_67,
+	reduce_68,
+	reduce_69,
+	reduce_70,
+	reduce_71,
+	reduce_72,
+	reduce_73,
+	reduce_74,
+	reduce_75,
+	reduce_76,
+	reduce_77,
+	reduce_78,
+	reduce_79,
+	reduce_80,
+	reduce_81,
+	reduce_82,
+	reduce_83,
+	reduce_84,
+	reduce_85,
+	reduce_86,
+	reduce_87,
+	reduce_88,
+	reduce_89,
+	reduce_90,
+	reduce_91,
+	reduce_92,
+	reduce_93,
+	reduce_94,
+	reduce_95,
+	reduce_96,
+	reduce_97,
+	reduce_98,
+	reduce_99,
+	reduce_100,
+	reduce_101,
+	reduce_102,
+	reduce_103,
+	reduce_104,
+	reduce_105,
+	reduce_106,
+	reduce_107,
+	reduce_108,
+	reduce_109,
+	reduce_110,
+	reduce_111,
+	reduce_112,
+	reduce_113,
+	reduce_114,
+	reduce_115,
+	reduce_116,
+	reduce_117,
+	reduce_default,
+	reduce_default,
+	reduce_default,
+	reduce_default,
+	reduce_default,
+	reduce_123,
+	reduce_default,
+	reduce_default,
+	reduce_default,
+	reduce_127,
+	reduce_128,
+	reduce_129,
+	reduce_130,
+	reduce_default,
+	reduce_default,
+	reduce_default,
+	reduce_default,
+	reduce_default,
+	reduce_136,
+	reduce_default,
+	reduce_default,
+	reduce_139,
+};
+(reducers[yyruleno as uint8])();
+	CopyMinor(&yylhs, &([@next yytos].minor));
+
+	var yygoto := yyRuleInfoLhs[yyruleno as @indexof yyRuleInfoLhs];
+	var stateno := yytos.stateno;
+	yyact := yy_default[stateno as @indexof yy_default];
+	if stateno <= YY_REDUCE_COUNT then
+		var i := (yy_reduce_ofst[stateno as @indexof yy_reduce_ofst] as @indexof yy_action)
+				+ (yygoto as @indexof yy_action);
+		if (i>=0) and (i<YY_ACTTAB_COUNT) and (yy_lookahead[i as @indexof yy_lookahead] == yygoto) then
+			yyact := yy_action[i];
+		end if;
+	end if;
+
+	yytos := @next yytos;
+	yytos.stateno := yyact;
+	yytos.major := yygoto;
+
+	#yy_trace_shift(yyact, "...then shift");
+end sub;
+
+# parse failure code
+sub yy_parse_failed() is
+	yy_pop_all_parser_stack();
+end sub;
+
+# syntax error code
+sub yy_syntax_error(yymajor: YYCODETYPE, yyminor: [ParseTOKENTYPE]) is
+#line 30 "src/cowfe/parser.y"
+
+	StartError();
+	print("unexpected ");
+	print(yyTokenName[yymajor]);
+	EndError();
+#line 2792 ".obj/src/cowfe+parser/parser.coh"
+end sub;
+
+# parse accept code
+sub yy_accept() is
+end sub;
+
+sub ParserInit() is
+	yyerrcnt := -1;
+	yytos := &yystack[0];
+	yystack[0].stateno := 0;
+	yystack[0].major := 0;
+end sub;
+
+sub ParserDeinit() is
+	while yytos != &yystack[0] loop
+		yy_pop_parser_stack();
+	end loop;
+end sub;
+
+sub ParserFeedToken(yymajor: YYCODETYPE, yyminor: [YYMINORTYPE]) is
+	var yyact := yytos.stateno;
+
+	#print("Input '");
+	#print(yyTokenName[yymajor]);
+	#if yyact < YY_MIN_REDUCE then
+	#	print("' in state ");
+	#	print_i16(yyact as uint16);
+	#else
+	#	print("' with pending reduce ");
+	#	print_i16((yyact - YY_MIN_REDUCE) as uint16);
+	#end if;
+	#print_nl();
+
+	loop
+		if yyact <= YY_MAX_SHIFT then
+			var i := yy_shift_ofst[yyact as @indexof yy_shift_ofst] + (yymajor as YYTOKENOFFSETTYPE);
+			if yy_lookahead[i as @indexof yy_lookahead] != yymajor then
+				yyact := yy_default[yyact as @indexof yy_default];
+			else
+				yyact := yy_action[i as @indexof yy_action];
+			end if;
+		end if;
+
+		if yyact >= YY_MIN_REDUCE then
+			yyact := yy_reduce(yyact - YY_MIN_REDUCE, yymajor);
+		elseif yyact <= YY_MAX_SHIFTREDUCE then
+			if yytos == &yystack[YYSTACKDEPTH] then
+				yy_stack_overflow();
+				return;
+			end if;
+			yytos := @next yytos;
+
+			if yyact > YY_MAX_SHIFT then
+				yyact := yyact + (YY_MIN_REDUCE - YY_MIN_SHIFTREDUCE);
+			end if;
+
+			yytos.stateno := yyact;
+			yytos.major := yymajor;
+			CopyMinor(yyminor, &yytos.minor);
+			#yy_trace_shift(yyact, "Shift");
+
+			if yyerrcnt >= 0 then
+				yyerrcnt := yyerrcnt - 1;
+			end if;
+			break;
+		elseif yyact == YY_ACCEPT_ACTION then
+			yytos := @prev yytos;
+			yy_accept();
+			break;
+		else
+			if yyerrcnt <= 0 then
+				yy_syntax_error(yymajor, &yyminor.yy0);
+			end if;
+			yyerrcnt := 3;
+			yy_destructor(yymajor, yyminor);
+			if yymajor == 0 then
+				yy_parse_failed();
+				yyerrcnt := -1;
+			end if;
+			break;
+		end if;
+	
+		if yytos == &yystack[0] then
+			break;
+		end if;
+	end loop;
+end sub;
+
