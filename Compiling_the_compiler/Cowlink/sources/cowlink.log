@@ -1,0 +1,162 @@
+D>cowfe cowlink.cow tmp
+COWFE: 19kB free main memory
+448kB free extended memory
+  > COWLINK.COW
+    > cowgol.coh
+      > common.coh
+    < cowgol.coh
+  < COWLINK.COW
+    > argv.coh
+  < COWLINK.COW
+    > strings.coh
+  < COWLINK.COW
+    > malloc.coh
+  < COWLINK.COW
+    > file.coh
+      > commonf.coh
+    < file.coh
+  < COWLINK.COW
+    > lcoodecl.coh
+  < COWLINK.COW
+    > ltypes.coh
+  < COWLINK.COW
+    > utils.coh
+  < COWLINK.COW
+    > lemitter.coh
+  < COWLINK.COW
+    > archlink.coh
+  < COWLINK.COW
+    > cooread.coh
+  < COWLINK.COW
+    > streams.coh
+  < COWLINK.COW
+    > asmwrite.coh
+  < COWLINK.COW
+    > graph.coh
+  < COWLINK.COW
+done: 19kB free main memory
+399kB free extended memory
+
+D>cowbe tmp cowlink.coo
+COWBE: 24kB free main memory
+448kB free extended memory
+__main
+Exit
+ExitWithError
+AlignUp
+get_char
+print_char
+MemSet
+print
+print_nl
+UIToA
+IToA
+print_i32
+print_i16
+print_i8
+print_hex_i8
+print_hex_i16
+print_hex_i32
+AToI
+MemZero
+ArgvInit
+ArgvNext
+StrCmp
+ToLower
+StrICmp
+StrLen
+CopyString
+MemCopy
+DumpBlocks
+CheckMemoryChain
+RawAlloc
+Alloc
+AddFreeBlock
+Free
+GetFreeMemory
+StrDup
+file_i_init
+fill
+fcb_i_gbpb
+fcb_i_blockin
+fcb_i_blockout
+fcb_i_changeblock
+fcb_i_convert_a_to_error
+FCBOpenIn
+FCBOpenUp
+FCBOpenOut
+FCBClose
+FCBSeek
+FCBPos
+FCBExt
+fcb_i_nextchar
+FCBGetChar
+FCBPutChar
+FCBPutString
+FCBGetBlock
+FCBPutBlock
+StartError
+EndError
+SimpleError
+CannotOpen
+E_b8
+E
+E_u32
+E_u16
+E_u8
+E_i16
+E_h
+E_h8
+E_h16
+EmitterOpenfile
+EmitterClosefile
+E_nl
+ArchAlignUp
+ArchEmitSubRef
+ArchEmitWSRef
+ArchEmitHeader
+ArchEmitFooter
+read_bin1
+read_bin2
+read_string
+AddRef
+FindSub
+FindOrCreateSub
+Deref
+FindOrCreateExternal
+OpenAndLoadCoo
+InitStreams
+SetStream
+CheckSubExists
+WriteCharacterFromStream
+ParseWsRef
+FlushStream
+WriteStream
+WriteSubroutinesToOutputFile
+MalformedError
+UnexpectedEndOfChunk
+ReadB1
+ReadB2
+CopySourceChunk
+WriteAllSubroutinesToOutputFile
+ResolveExternals
+PlaceSubroutines
+push
+SyntaxError
+AddInputFile
+done: 17kB free main memory
+444kB free extended memory
+
+D>cowlink cowgol.coo cowlink.coo -o tmp.as
+COWLINK: 48kB free
+Adding input file: COWGOL.COO
+Adding input file: COWLINK.COO
+Analysing...
+Workspace sizes:
+  #0: 912 bytes
+Creating output file: TMP.AS
+Copying from input file: COWGOL.COO
+Copying from input file: COWLINK.COO
+done: 39kB free
+
+D>
