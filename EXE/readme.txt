@@ -4,7 +4,7 @@ The executables from HiTech's C toolchain are also included ($EXEC, CPP, P1, CGE
 
 These executables are valid for all Z80 CP/M computers provided with 64KB RAM.
 
-Also, the source files for the COWGOL command line processor and for COWFIX are included.
+Also, the source files for the COWGOL command line processor (cowgol.c) and for COWFIX (cowfix.c and fix.as) are included.
 
 What is COWFIX?
 
@@ -136,8 +136,6 @@ On the other hand, if you are not interested in optimizing the code of your exec
 >cowgol hexdump.cow
 
 , which will result in a shorter compile time, with the disadvantage of obtaining a slightly larger and slower executable.
-
-The source files of Cowfix are included (cowfix.c and fix.as)
 
 WARNING
 -------
