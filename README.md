@@ -76,7 +76,7 @@ There are more than one way to configure a Cowgol source file.
 
 Variant 1: the source file contains all the needed text, no 'include' used.
 
-Variant 2: there are more than one cowgol source files (see example nr.3 in the EXAMPLES folder)
+Variant 2: there are more than one cowgol source files, using the 'external' feature (see example nr.3 in the EXAMPLES folder)
 
 Variant 3: the source file contains 'include .coh' statements, and these .coh files contain cowgol subroutines (see hexdump.cow in EXAMPLES folder)
 
