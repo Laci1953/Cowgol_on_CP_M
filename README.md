@@ -282,13 +282,13 @@ containing the exact addresses of the variables.
 Here is a fragment of the dump of the $SUBSYMS.$$$ file:
 
 ------------------------------------
-D>dumpx $subsyms.$$$
-0000 : 5F 5F 6D 61 69 6E 00 4C 4F 4D 45 4D 00 00 00 5F : __main.LOMEM..._
-0010 : 5F 6D 61 69 6E 00 48 49 4D 45 4D 00 02 00 41 6C : _main.HIMEM...Al
-0020 : 69 67 6E 55 70 00 69 6E 00 00 00 41 6C 69 67 6E : ignUp.in...Align
-0030 : 55 70 00 6F 75 74 00 02 00 67 65 74 5F 63 68 61 : Up.out...get_cha
-0040 : 72 00 63 00 00 00 70 72 69 6E 74 5F 63 68 61 72 : r.c...print_char
-...
+	D>dumpx $subsyms.$$$
+	0000 : 5F 5F 6D 61 69 6E 00 4C 4F 4D 45 4D 00 00 00 5F : __main.LOMEM..._
+	0010 : 5F 6D 61 69 6E 00 48 49 4D 45 4D 00 02 00 41 6C : _main.HIMEM...Al
+	0020 : 69 67 6E 55 70 00 69 6E 00 00 00 41 6C 69 67 6E : ignUp.in...Align
+	0030 : 55 70 00 6F 75 74 00 02 00 67 65 74 5F 63 68 61 : Up.out...get_cha
+	0040 : 72 00 63 00 00 00 70 72 69 6E 74 5F 63 68 61 72 : r.c...print_char
+	...
 
 
 # The Cowgol executables
