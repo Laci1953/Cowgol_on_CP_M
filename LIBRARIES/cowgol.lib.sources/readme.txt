@@ -13,3 +13,5 @@ You can add / modify this library, using the same syntax:
 
 (adding / updating the 'file' object)
 >libr r cowgol.lib file.obj
+
+For any new subroutine added in the library, you must also add a corresponding .coh file
