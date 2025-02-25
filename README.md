@@ -471,3 +471,5 @@ Instead, when using the present development environment, all that's needed to bu
 
 The full cowgol toolchain will be executed, followed by assembling the resulting assembler file and linking-it to the myfile.com executable.
 
+I opted to use as support the HiTech's toolchain, because the HiTech source files were available and I had a good enough expertise in using the HiTech tools. 
+Therefore, the output of COWLINK (after passing through a preliminary filter) is assembled by Z80AS (a substitute for ZAS, the original HiTech Z80 assembler), then the object file is processed by LINK, to obtain as a final result the .COM file.
