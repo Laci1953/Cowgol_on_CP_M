@@ -1,0 +1,15 @@
+sub BiosSetup() is
+@asm "jp __BiosSetup";
+end sub;
+
+sub ConOut(ch: uint8) is
+@asm "jp __ConOut";
+end sub;
+
+sub ConIn(): (ret: uint8) is
+@asm "jp __ConIn";
+end sub;
+
+sub ConSts(): (ret: uint8) is
+@asm "jp __ConSts";
+end sub;
