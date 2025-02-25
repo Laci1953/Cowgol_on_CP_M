@@ -82,7 +82,7 @@ Variant 3: the source file contains 'include .coh' statements, and these .coh fi
 
 Variant 4: the source file contains 'include .coh' statements, and these .coh files contain only declaration of cowgol subroutines (see startrek.cow in GAMES folder)
 
-Variant 5: the source file contains 'include .coh' statements, and these .coh files contain 'jumps' to routines contained in the cowgol.lib library, used at the final LINK step
+Variant 5: the source file contains 'include .coh' statements, and these .coh files contain 'jumps' to routines contained in the cowgol.lib library, used at the final LINK step (see bowling.cow in GAMES folder)
 
 Of course, Cowgol and C and/or assembler files can be also mixed (see the EXAMPLES folder)
 
