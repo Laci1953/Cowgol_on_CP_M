@@ -465,9 +465,9 @@ Of course, you can use them in separate steps, like:
 	>
 , but then you must use an assembler (by the way, one who accepts some exotic Z80 assembly statements - e.g. 'push h') and then build (how?) the final 'myfile.com'.
 
-Instead, when using the present development environment, all that's needed to build myfile.com is:
+Instead, when using the present development environment, all that's needed to build myfile.com is to type:
 
 	>cowgol myfile.cow
 
- 
-"
+The full cowgol toolchain will be executed, followed by assembling the resulting assembler file and linking-it to the myfile.com executable.
+
