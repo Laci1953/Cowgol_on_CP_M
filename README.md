@@ -1,7 +1,7 @@
 # Cowgol_on_CP_M
 Cowgol, C & assembler development environment hosted on Z80 computers running CP/M
 -------------------------------------------------------------------
-(updated on february, 2025 - aligned to the last version found on the Cowgol site)
+(updated on february, 2025 - aligned to the last version found on the Cowgol site, see below)
 
 You will find here a complete Cowgol development environment, hosted on CP/M, for Z80 computers.
 
