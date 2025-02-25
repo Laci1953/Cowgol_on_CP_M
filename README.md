@@ -97,23 +97,23 @@ We use the source file "hexdump.cow".
 Here is the cowgol source code of the "print_hex_i8" subroutine, used in "hexdump.cow":
 
 -------------------------------------
-sub print_hex_i8(value: uint8) is
-    var i: uint8 := 2;
-    loop
-        var digit := value >> 4;
-        if digit < 10 then
-            digit := digit + '0';
-        else
-            digit := digit + ('a' - 10);
-        end if;
-        print_char(digit);
-        value := value << 4;
-        i := i - 1;
-        if i == 0 then
-            break;
-        end if;
-    end loop;
-end sub;
+	sub print_hex_i8(value: uint8) is
+	    var i: uint8 := 2;
+	    loop
+	        var digit := value >> 4;
+ 	       	if digit < 10 then
+ 	           digit := digit + '0';
+        	else
+            	   digit := digit + ('a' - 10);
+        	end if;
+        	print_char(digit);
+        	value := value << 4;
+        	i := i - 1;
+        	if i == 0 then
+            	  break;
+        	end if;
+    		end loop;
+	end sub;
 ------------------------------------
 
 Here is a fragment of the Cowgol command log , when building "hexdump.com" :
