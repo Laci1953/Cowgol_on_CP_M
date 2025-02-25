@@ -118,40 +118,40 @@ Here is the cowgol source code of the "print_hex_i8" subroutine, used in "hexdum
 
 Here is a fragment of the Cowgol command log , when building "hexdump.com" :
 
-(executed on a 512 KB RAM machine)
+	(executed on a 512 KB RAM machine)
 
-(the -S option is used to build the cowgol variables map)
-(the -O option is used to optimize the assembler code produced by Cowlink...)
-(the -T option is used by the LINK linker to build the s.sym file containing a table of the variables and their absolute values)
+	(the -S option is used to build the cowgol variables map)
+	(the -O option is used to optimize the assembler code produced by Cowlink...)
+	(the -T option is used by the LINK linker to build the s.sym file containing a table of the variables and their absolute values)
 
 ------------------------------------
-D>cowgol -o -s -ts hexdump.cow
-COWGOL COMPILER (CP/M-80) V2.0
-Copyright (C) David Given
-0:COWFE     HEXDUMP.COW $CTMP1.$$$ -S
-COWFE: 19kB free main memory
-448kB free extended memory
-  > HEXDUMP.COW
-    > stdcow.coh
- ...
-  < HEXDUMP.COW
-done: 16kB free main memory
-425kB free extended memory
-0:COWBE $CTMP1.$$$ HEXDUMP.COO
-COWBE: 23kB free
-__main
-...
-Hexdump
-done: 16kB free
-ERA $CTMP1.$$$
-ERA $CTMP2.$$$
-0:COWLINK COWGOL.COO HEXDUMP.COO -o $CTMP1.$$$ -S
-COWLINK: 44kB free
-Adding input file: COWGOL.COO
-Adding input file: HEXDUMP.COO
-Analysing...
-Workspace sizes:
-  #0: 231 bytes
+	D>cowgol -o -s -ts hexdump.cow
+	COWGOL COMPILER (CP/M-80) V2.0
+	Copyright (C) David Given
+	0:COWFE     HEXDUMP.COW $CTMP1.$$$ -S
+	COWFE: 19kB free main memory
+	448kB free extended memory
+  	> HEXDUMP.COW
+    	> stdcow.coh
+ 	...
+  	< HEXDUMP.COW
+	done: 16kB free main memory
+	425kB free extended memory
+	0:COWBE $CTMP1.$$$ HEXDUMP.COO
+	COWBE: 23kB free
+	__main
+	...
+	Hexdump
+	done: 16kB free
+	ERA $CTMP1.$$$
+	ERA $CTMP2.$$$
+	0:COWLINK COWGOL.COO HEXDUMP.COO -o $CTMP1.$$$ -S
+	COWLINK: 44kB free
+	Adding input file: COWGOL.COO
+	Adding input file: HEXDUMP.COO
+	Analysing...
+	Workspace sizes:
+  	#0: 231 bytes
 
 Subroutines and Variables map
 
