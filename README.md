@@ -427,3 +427,47 @@ You may find a lot of interesting Cowgol programs here: https://rosettacode.org/
 
 Select one of the 164 programs, then select on the left panel the Cowgol language, and you will see the source code of the program.
 
+# Why a Cowgol development environment was needed for Z80 CP/M?
+---------------------------------------------------------------
+
+Simply because no such development environment was available!
+
+If you look at the original Cowgol site, you will notice that you are provided there only with the Cowgol compiler & linker source files.
+You must download them on a computer running a UNIX-like operating system and build the compiler executables, after installing a lot of stuff:
+
+(here is a fragment of David Given's advices)
+
+"to build, you'll need a Unixish machine (I develop on Linux) with some dependencies.
+chronic, Python 3 and Lua 5.1 (needed for the build)
+the Pasmo Z80 assembler (needed to build part of the CP/M emulator)
+the 64tass 6502 assembler (needed to build the 6502 code)
+the libz80ex Z80 emulation library (needed for the CP/M emulator)
+flex and bison and libbsd and libreadline (these are standard)
+a C compiler and these GNU binutils packages:
+i686-linux-gnu
+arm-linux-gnueabihf
+m68k-linux-gnu
+m68k-atari-mint Packages are available from http://vincent.riviere.free.fr/soft/m68k-atari-mint
+powerpc-linux-gnu
+the nasm ix86 assembler
+the qemu userspace emulator
+the gpp preprocessor"
+
+(good luck...)
+
+After eventually succeding to build the executables, you get COWFE.COM, COWBE.COM and COWLINK.COM.
+
+Of course, you can use them in separate steps, like:
+
+	>cowfe myfile.cow tmp
+	>cowbe tmp myfile.coo
+	>cowlink cowgol.coo -o myfile.asm
+	>
+, but then you must use an assembler (by the way, one who accepts some exotic Z80 assembly statements - e.g. 'push h') and then build (how?) the final 'myfile.com'.
+
+Instead, when using the present development environment, all that's needed to build myfile.com is:
+
+	>cowgol myfile.cow
+
+ 
+"
