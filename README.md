@@ -15,7 +15,7 @@ COWGOL [-C] [-Mfile] [-Lfile] [-Tfile] [-O] [-S] file1.ext ... [ filen.ext ]
 
 If the option -C is specified, the files will be only compiled/assembled.
 
-If the option -C is not specified, the files will be first compiled/assembled, then linked into a CP/M executable (named after the first file in the list).
+If the option -C is not specified, the files will be first compiled/assembled, then linked into a CP/M executable (named after the first cowgol file in the list).
 
 The option -Mfile builds the "file.map" memory map file for the executable.
 
