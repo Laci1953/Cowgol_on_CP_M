@@ -4,7 +4,7 @@ It must be compiled, on 128KB/512KB RAM computers, using the following command l
 
 >cowgol -o -lcowgol bowling.cow
 
-The '-lcowgol' option instructs the LINK linker, at the final stage when building the executable, to include the HiTech cowgol.lib in its command line.
+The '-lcowgol' option instructs the LINK linker, at the final stage when building the executable, to include the cowgol.lib in its command line.
 
 In the bowling.cow source file, the following lines are used:
 
