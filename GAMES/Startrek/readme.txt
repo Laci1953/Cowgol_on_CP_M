@@ -4,7 +4,7 @@ It can be compiled only on Z80 machines provided with 128/512 KB RAM
 
 The st.* files are needed at run time.
 
-D>cowgol -o misc.coo string.coo seqfile.coo startrek.cow
+D>cowgol -o misc.coo string.coo seqfile.coo startrek.cow xrnd.as
 COWGOL COMPILER (CP/M-80) V2.0
 Copyright (C) David Given
 STARTREK.COW
