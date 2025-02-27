@@ -1,0 +1,2 @@
+cowgol -o misc.coo string.coo ranfile.coo advent.cow advtrav.cow advmain.cow
+
