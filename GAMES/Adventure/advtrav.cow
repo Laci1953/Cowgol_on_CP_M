@@ -369,7 +369,7 @@ sub gettrav(loc: uint8) @extern("gettrav") is
 	aptr := &atrav[0];
 
 	q1 := strchr(p1, ',');
-	while q1 != 0 loop
+	while q1 != nil loop
 		[q1] := 0;
 		dummy := strcpy(aptr, p1);
 		p1 := q1 + 1;
