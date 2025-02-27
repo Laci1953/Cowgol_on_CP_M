@@ -17,7 +17,7 @@
 ##  Adapted for HiTech C Z80 under CP/M by Ladislau Szilagyi, Oct. 2023
 ##  Uncommented Daimler's disabled verbs - game is complete again !
 ##  Added a new pseudo-random number generator (Xorshift)
-##  Adapted to Cowgol language by Ladislau Szilagyi, Feb. 2024
+##  Adapted to Cowgol language by Ladislau Szilagyi, Feb. 2025
 
 include "misc.coh";
 include "string.coh";
