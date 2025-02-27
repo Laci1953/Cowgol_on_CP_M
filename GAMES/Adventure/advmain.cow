@@ -1394,7 +1394,7 @@ sub scanint(pi: [int16], str: [uint8]) @extern("scanint") is
 	var p: [uint8];
 
 	p := str;
-	while [p] != 0 loop
+	while [p] != nil loop
 		if [p] == ',' then
 			[p] := 0;
 		end if;
@@ -1402,7 +1402,7 @@ sub scanint(pi: [int16], str: [uint8]) @extern("scanint") is
 	end loop;
 
 	p := str;
-	while [p] != 0 loop
+	while [p] != nil loop
 		[pi] := atoi(p);
 		pi := @next pi;
 		p := p + strlen(p) + 1;
