@@ -73,7 +73,17 @@ STRING:
 @decl sub strchr(str: [uint8], tosearch: uint8): (ret: [uint8]) @extern("strchr");
 @decl sub tolower(char: uint8): (ret: uint8) @extern("tolower");
 
+RANFILE (Random access files)
 ------------
+@decl sub FCBOpenIn(fcb: [FCB], filename: [uint8]): (errno: uint8) @extern("FCBOpenIn");
+@decl sub FCBOpenUp(fcb: [FCB], filename: [uint8]): (errno: uint8) @extern("FCBOpenUp");
+@decl sub FCBOpenOut(fcb: [FCB], filename: [uint8]): (errno: uint8) @extern("FCBOpenOut");
+@decl sub FCBClose(fcb: [FCB]): (errno: uint8) @extern("FCBClose");
+@decl sub FCBSeek(fcb: [FCB], pos: uint32) @extern("FCBSeek");
+@decl sub FCBPos(fcb: [FCB]): (pos: uint32) @extern("FCBPos");
+@decl sub FCBExt(fcb: [FCB]): (len: uint32) @extern("FCBExt");
+@decl sub FCBGetChar(fcb: [FCB]): (c: uint8) @extern("FCBGetChar");
+@decl sub FCBPutChar(fcb: [FCB], c: uint8) @extern("FCBPutChar");
 
 The source files of the libraries are published here too.
 
