@@ -4,7 +4,7 @@ The advent1.txt ... advent4.txt files must be present when running the game.
 
 It must be compiled on a 128KB/512KB RAM Z80 machine.
 
-To save a game use : save, suspend
+To save a game say : save (or suspend)
 To restore a saved game : >advent r
 
 D>advent
