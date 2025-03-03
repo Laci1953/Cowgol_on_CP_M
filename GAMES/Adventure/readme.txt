@@ -4,6 +4,8 @@ The advent1.txt ... advent4.txt files must be present when running the game.
 
 It must be compiled on a 128KB/512KB RAM Z80 machine.
 
+The file vocab.txt contains all the accepted verbs and nouns.
+
 To save a game say : save (or suspend)
 To restore a saved game use the 'r' option: >advent r
 
