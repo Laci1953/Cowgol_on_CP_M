@@ -5,9 +5,11 @@ The advent1.txt ... advent4.txt files must be present when running the game.
 It must be compiled on a 128KB/512KB RAM Z80 machine.
 
 To save a game say : save (or suspend)
-To restore a saved game : >advent r
+To restore a saved game use the 'r' option: >advent r
 
-D>advent
+Run sample, including some hints:
+
+c>advent
 
 
                 Welcome to ADVENTURE!
@@ -21,7 +23,7 @@ D>advent
 
             Would you like instructions?
 
->yes
+>y
 
 
 Somewhere nearby is Colossal Cave, where others have
@@ -63,8 +65,26 @@ in the forest.  Also, note that cave passages turn a lot, and
 that leaving a room to the north does not guarantee entering
 the next from the south.
 Good luck!
+>eat food
+Thank you.  It was delicious!
+>drink water
+The bottle of water is now empty.
+>take keys
+ok.
+>take lamp
+ok.
+>light lamp
+Your lamp is now on.
+>inventory
+You are currently holding the following:
+Set of keys.
+Brass lantern
+>go west
+You are standing at the end of a road before a small brick
+building.  Around you is a forest.  A small stream flows out
+of the building and down a gully.
 >
-
+...
 ---------------------------
 
 This is an early functional version of the game, probably there are still bugs to be fixed.
