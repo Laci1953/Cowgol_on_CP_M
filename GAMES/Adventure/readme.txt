@@ -7,7 +7,7 @@ It must be compiled on a 128KB/512KB RAM Z80 machine.
 To save a game say : save (or suspend)
 To restore a saved game use the 'r' option: >advent r
 
-Run sample, including some hints:
+Here is a run sample, including some hints:
 
 c>advent
 
