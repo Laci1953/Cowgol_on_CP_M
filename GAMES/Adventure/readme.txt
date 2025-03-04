@@ -3,6 +3,7 @@ The Colossal Cave adventure game, ported to the Cowgol language.
 The advent1.txt ... advent4.txt files must be present when running the game.
 
 It must be compiled on a 128KB/512KB RAM Z80 machine.
+The compilation process will take some time to be completed : 11 min when executed on Z80LL (25MHz) or 35 min when executed on a 7MHz Z80 computer.
 
 The file vocab.txt contains all the accepted verbs and nouns.
 
