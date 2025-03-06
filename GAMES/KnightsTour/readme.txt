@@ -4,7 +4,7 @@ The computer will keep trying to generate such tours,
  until succesfuly completing one!
 
 To compile:
->cowgol -o -lcowgol misc.coo string.coo knight.cow
+D>cowgol -o -lcowgol misc.coo string.coo knight.cow
 
 It works on any VT100 compatible terminal.
 
