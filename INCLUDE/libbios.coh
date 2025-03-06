@@ -13,3 +13,7 @@ end sub;
 sub ConSts(): (ret: uint8) is
 @asm "jp __ConSts";
 end sub;
+
+sub putstr(str: [uint8]) is
+@asm "jp __putstr";
+end sub;
