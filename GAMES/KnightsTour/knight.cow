@@ -1,0 +1,439 @@
+include "misc.coh";
+include "string.coh";
+include "libbios.coh";
+
+# escape sequences for VT100 compatible terminal 
+
+const ESC := 27;
+
+var ClearScreen: uint8[5] := {ESC,'[','2','J',0};
+
+var SetYXPos: uint8[9] := {ESC,'[',' ',' ',';',' ',' ','H',0};
+# 2,3 must be filled with Y coordinates, in decimal
+# 5,6 must be filled with X coordinates, in decimal
+
+var dummy: [uint8];
+
+var Pause: uint16 := 0x8000;
+
+var bufchess: uint8[40];
+bufchess[0] := 0;
+
+sub CursorOff() is
+	ConOut(ESC);
+	ConOut('[');
+	ConOut('?');
+	ConOut('2');
+	ConOut('5');
+	ConOut('l');
+end sub;
+
+sub CursorOn() is
+	ConOut(ESC);
+	ConOut('[');
+	ConOut('?');
+	ConOut('2');
+	ConOut('5');
+	ConOut('h');
+end sub;
+
+sub Set01() is
+	ConOut(ESC);
+	ConOut('[');
+	ConOut('1');
+	ConOut(';');
+	ConOut('1');
+	ConOut('H');
+	ConOut(' ');
+end sub;
+
+sub Clear() is
+	ConOut(ESC);
+	ConOut('[');
+	ConOut('2');
+	ConOut('J');
+end sub;
+
+sub SetYX(y0: uint8, y1: uint8, x0: uint8, x1: uint8, buf: [uint8]) is
+  SetYXPos[2] := y0;
+  SetYXPos[3] := y1;
+  SetYXPos[5] := x0;
+  SetYXPos[6] := x1;
+  dummy:= strcpy(buf, &SetYXPos[0]);
+end sub;
+
+var FirstRun: uint8 := 1;
+
+# Move pattern on basis of the change of x coordinates and y coordinates respectively
+# to maintain the knight's position 
+var cx: int16[8] := {1,1,2,2,-1,-1,-2,-2};
+var cy: int16[8] := {2,-2,1,-1,2,-2,1,-1}; 
+
+# the chess board
+var board: int16[64];
+
+var x: int16;
+var y: int16;
+var sx: int16;
+var sy: int16;
+
+var Column: uint8[8] := {'A','B','C','D','E','F','G','H'};
+var Row: uint8[8] := {'1','2','3','4','5','6','7','8'};
+var Moves: uint8[128];
+var bufChess: uint8[40];
+
+sub PrintMoves() is
+  var i: uint8;
+  var j: uint8;
+  var index: int16;
+
+  i := 0;
+  while i < 64 loop
+    Moves[i * 2 as uint8] := 0;
+    i := i + 1;
+  end loop;
+ 
+  i := 0;
+  while i < 8 loop
+    j := 0;
+    while j < 8 loop
+      index := board[j * 8 + i] - 1;
+      if index >= 0 then
+        Moves[index as uint8 * 2 ] := Column[j];
+        Moves[index as uint8 * 2 + 1] := Row[i];
+      end if;
+      j := j + 1;
+    end loop;
+    i := i + 1;
+  end loop;
+
+  i := 0;
+  while i < 64 loop
+    if Moves[i * 2] != 0 then
+      putstr("\r\nMove nr.");
+      print_i8(i as int8 + 1);
+      putstr(": Knight ");
+      ConOut(Moves[i * 2]);
+      ConOut(Moves[i * 2 + 1]);
+    else
+      break;
+    end if;
+    i := i + 1;
+  end loop;
+end sub;
+
+sub PrintLine1(buf: [uint8]) is
+  dummy := strcat(buf, "+--+--+--+--+--+--+--+--+");
+  putstr(buf);
+end sub;
+
+sub PrintLine2(buf: [uint8]) is
+  dummy := strcat(buf, "|  |  |  |  |  |  |  |  |");
+  putstr(buf);
+end sub;
+
+sub PrintBaseLine(buf: [uint8]) is
+  dummy := strcat(buf, "A  B  C  D  E  F  G  H");
+  putstr(buf);
+end sub;
+
+sub wait() is
+  var i: uint16;
+
+  if ConSts() == 0xFF then
+    var ch: uint8 := ConIn();
+    if ch == 's' then
+      if Pause < 0x8000 then
+        Pause := Pause << 1;
+      end if;
+    elseif ch == 'f' then
+      if Pause > 1 then
+        Pause := Pause >> 1;
+      end if;
+    elseif ch == 'q' then
+      CursorOn();
+      exit();
+    end if;
+  end if;
+
+  i := Pause;
+  while i > 0 loop
+    i := i - 1;
+  end loop;
+end sub;
+
+sub PrintBoard() is
+  if FirstRun > 0 then
+    SetYX('0','1','0','2', &bufChess[0]);
+    PrintLine1(&bufchess[0]);
+    SetYX('0','2','0','1', &bufchess[0]);
+    dummy := strcat(&bufchess[0], "8");
+    PrintLine2(&bufchess[0]);
+    SetYX('0','3','0','2', &bufchess[0]);
+    PrintLine1(&bufchess[0]);
+    SetYX('0','4','0','1', &bufchess[0]);
+    dummy := strcat(&bufchess[0], "7");
+    PrintLine2(&bufchess[0]);
+    SetYX('0','5','0','2', &bufchess[0]);
+    PrintLine1(&bufchess[0]);
+    SetYX('0','6','0','1', &bufchess[0]);
+    dummy := strcat(&bufchess[0], "6");
+    PrintLine2(&bufchess[0]);
+    SetYX('0','7','0','2', &bufchess[0]);
+    PrintLine1(&bufchess[0]);
+    SetYX('0','8','0','1', &bufchess[0]);
+    dummy := strcat(&bufchess[0], "5");
+    PrintLine2(&bufchess[0]);
+    SetYX('0','9','0','2', &bufchess[0]);
+    PrintLine1(&bufchess[0]);
+    SetYX('1','0','0','1', &bufchess[0]);
+    dummy := strcat(&bufchess[0], "4");
+    PrintLine2(&bufchess[0]);
+    SetYX('1','1','0','2', &bufchess[0]);
+    PrintLine1(&bufchess[0]);
+    SetYX('1','2','0','1', &bufchess[0]);
+    dummy := strcat(&bufchess[0], "3");
+    PrintLine2(&bufchess[0]);
+    SetYX('1','3','0','2', &bufchess[0]);
+    PrintLine1(&bufchess[0]);
+    SetYX('1','4','0','1', &bufchess[0]);
+    dummy := strcat(&bufchess[0], "2");
+    PrintLine2(&bufchess[0]);
+    SetYX('1','5','0','2', &bufchess[0]);
+    PrintLine1(&bufchess[0]);
+    SetYX('1','6','0','1', &bufchess[0]);
+    dummy := strcat(&bufchess[0], "1");
+    PrintLine2(&bufchess[0]);
+    SetYX('1','7','0','2', &bufchess[0]);
+    PrintLine1(&bufchess[0]);
+    SetYX('1','8','0','3', &bufchess[0]);
+    PrintBaseLine(&bufchess[0]);
+    SetYX('2','0','0','8', &bufchess[0]);
+    dummy := strcat(&bufchess[0],"Knight's tour");
+    putstr(&bufchess[0]);
+  else
+    SetYX('0','2','0','1', &bufchess[0]);
+    dummy := strcat(&bufchess[0], "8");
+    PrintLine2(&bufchess[0]);
+    SetYX('0','4','0','1', &bufchess[0]);
+    dummy := strcat(&bufchess[0], "7");
+    PrintLine2(&bufchess[0]);
+    SetYX('0','6','0','1', &bufchess[0]);
+    dummy := strcat(&bufchess[0], "6");
+    PrintLine2(&bufchess[0]);
+    SetYX('0','8','0','1', &bufchess[0]);
+    dummy := strcat(&bufchess[0], "5");
+    PrintLine2(&bufchess[0]);
+    SetYX('1','0','0','1', &bufchess[0]);
+    dummy := strcat(&bufchess[0], "4");
+    PrintLine2(&bufchess[0]);
+    SetYX('1','2','0','1', &bufchess[0]);
+    dummy := strcat(&bufchess[0], "3");
+    PrintLine2(&bufchess[0]);
+    SetYX('1','4','0','1', &bufchess[0]);
+    dummy := strcat(&bufchess[0], "2");
+    SetYX('1','6','0','1', &bufchess[0]);
+    dummy := strcat(&bufchess[0], "1");
+    PrintLine2(&bufchess[0]);
+  end if;
+end sub;
+
+sub LineToY(line: int16): (ret: int16) is
+  ret := (8 - line) * 2;
+end sub;
+
+sub ColumnToX(column: int16): (ret: int16) is
+  ret := (column * 3) + 3;
+end sub;
+
+sub MarkLineCol(line: int16, col: int16) is
+  var x: int16;
+  var y: int16;
+
+  y := LineToY(line);
+  x := ColumnToX(col);
+
+  SetYX('0'+(y/10) as uint8, '0'+(y%10) as uint8, '0'+(x/10) as uint8, '0'+(x%10) as uint8, &bufchess[0]);
+  dummy := strcat(&bufchess[0], "K");
+  putstr(&bufchess[0]);
+end sub;
+
+sub UnMarkLineCol(line: int16, col: int16) is
+  var x: int16;
+  var y: int16;
+
+  y := LineToY(line);
+  x := ColumnToX(col);
+
+  SetYX('0'+(y/10) as uint8, '0'+(y%10) as uint8, '0'+(x/10) as uint8, '0'+(x%10) as uint8, &bufchess[0]);
+  dummy := strcat(&bufchess[0], " ");
+  putstr(&bufchess[0]);
+end sub;
+
+# Warnsdorff algorithm code by Uddalak Bhaduri
+
+# function restricts the knight to remain within the 8x8 chessboard
+sub limits(x: int16, y: int16): (ret: uint8) is
+  if x >= 0 and y >= 0 and x < 8 and y < 8 then
+    ret := 1;
+  else
+    ret := 0;
+  end if;
+end sub;
+
+# checks whether a square is empty or not
+sub isempty(x: int16, y: int16): (ret: uint8) is
+  if limits(x,y) > 0 and board[y as uint8 * 8 + x as uint8] < 0 then
+    ret := 1;
+  else
+   ret := 0;
+  end if;
+end sub;
+
+# returns the number of empty squares
+sub getcount(x: int16, y: int16): (ret: int16) is
+  var i: int16;
+
+  ret := 0;
+  i := 0;
+  while i < 8 loop
+    if isempty(x + cx[i as uint8], y + cy[i as uint8]) > 0 then
+      ret := ret + 1;
+    end if;
+    i := i + 1;
+  end loop;
+end sub;
+
+# calculates the minimum degree(count) of unvisited square among its neighbours and assigns the counter to that square
+sub progress(): (ret: int16) is
+  var start: int16;
+  var count: int16;
+  var i: int16;
+  var flag: int16;
+  var c: int16;
+  var min: int16 := 8 + 1;
+  var nx: int16;
+  var ny: int16;
+
+  start := xrnd() as int16 % 8;
+
+  count := 0;
+  while count < 8 loop
+    i := (start + count) % 8;
+    nx := x + cx[i as uint8];
+    ny := y + cy[i as uint8];
+
+    if isempty(nx,ny) > 0 then
+      c := getcount(nx,ny);
+      if c < min then
+        flag := i;
+        min := c;
+      end if;
+    end if;
+    count := count + 1;
+  end loop;
+
+  if min == 8+1 then
+    ret := 0;
+    return;
+  end if;
+
+  nx := x + cx[flag as uint8];
+  ny := y + cy[flag as uint8];
+
+  board[ny as uint8 * 8 + nx as uint8] := board[y as uint8 * 8 + x as uint8] + 1;
+
+  MarkLineCol(nx, ny);
+
+  x := nx;
+  y := ny;
+
+  ret := 1;
+end sub;
+
+# checks its neighbouring squares
+# If the knight ends on a square that is one knight's move from the beginning square, then tour is closed
+sub neighbour(): (ret: int16) is
+  var i: uint8;
+
+  i := 0;
+  while i < 8 loop
+    if x+cx[i] == sx and y+cy[i] == sy then
+      ret := 1;
+      return;
+    end if;
+    i := i + 1;
+  end loop;
+  ret := 0;
+end sub;
+
+# generates the legal moves using warnsdorff's heuristics
+sub generate(): (ret: int16) is
+  var i: uint8;
+  var j: uint8;
+
+  i := 0;
+  while i < 8 loop
+    j := 0;
+    while j < 8 loop
+       board[i * 8 + j] :=-1; # filling up the chessboard matrix with -1's
+       j := j + 1;
+    end loop;
+    i := i + 1;
+  end loop;
+
+  PrintBoard();
+
+  FirstRun := 0;
+
+  sx := 0;
+  x := 0;
+  sy := 0;
+  y := 0;
+
+  board[y as uint8 * 8 + x as uint8] := 1; # initial position
+  MarkLineCol(x, y);
+
+  i := 0;
+  while i < 63 loop
+    wait();
+    if progress() == 0 then
+      ret := 0;
+      return;
+    end if;
+    i := i + 1;
+  end loop;
+
+  if neighbour() == 0 then
+    ret := 0;
+  else
+    ret := 1;
+  end if;
+end sub;
+
+## main ##
+
+  xrndseed();
+  BiosSetup();
+
+  putstr("A knight's tour is a sequence of moves of a knight on a chessboard\r\n");
+  putstr(" such that the knight visits every square exactly once.\r\n\r\n");
+  putstr("The computer will keep trying to generate such tours,\r\n");
+  putstr(" until succesfuly completing one!\r\n\r\n");
+  putstr("You can use the following keys: s=slower f=faster q=quit\r\n\r\n");
+  putstr("Hit any key to start...");
+  while ConSts() != 0xFF loop end loop;
+  CursorOff();
+  Clear();
+  Set01();
+
+  while generate() == 0 loop end loop;
+
+  CursorOn();
+  SetYX('2','1','0','1', &bufchess[0]);
+  dummy := strcat(&bufchess[0], "DONE! Print moves? (y=YES) :");
+  putstr(&bufchess[0]);
+  if ConIn() == 'y' then
+    PrintMoves();
+  end if;
+  exit();
