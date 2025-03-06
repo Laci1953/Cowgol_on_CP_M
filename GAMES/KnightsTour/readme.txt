@@ -5,3 +5,5 @@ The computer will keep trying to generate such tours,
 
 To compile:
 >cowgol -o -lcowgol misc.coo string.coo knight.cow
+
+It works on any VT100 compatible terminal.
