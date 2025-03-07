@@ -1,6 +1,6 @@
 You may find here some Cowgol libraries, handling CP/M sequential file functions, console I/O, strings and other.
 
-The default system library cowgol.coo contains 1-byte, 2-byte and 4-byte arithmetic routines, needed to implement cowgol operators * / ; it is by default included in the COWLINK command as the first file.
+The default system library cowgol.coo contains 1-byte, 2-byte and 4-byte arithmetic routines, needed to implement some common cowgol operators, such as * / ; it is by default included in the COWLINK command as the first file.
 
 Each other library comes with: an include file (.coh) and a cowgol object file (.coo)
 
