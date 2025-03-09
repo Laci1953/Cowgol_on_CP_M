@@ -69,10 +69,10 @@ The GAMES folder contains some computer games, rewritten in Cowgol.
 The EXAMPLES folder contains examples of Cowgol compilation sessions.
 
 
-# Configuring Cowgol source files
----------------------------------
+# How the Cowgol source files are structured
+--------------------------------------------
 
-There are more than one way to configure a Cowgol source file.
+There are more than one way to configure a Cowgol project.
 
 Variant 1: the source file contains all the needed text, no 'include' used.
 
