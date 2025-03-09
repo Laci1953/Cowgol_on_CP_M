@@ -2,4 +2,4 @@ Of course, I couldn't miss the opportunity to implement TETRIS in the Cowgol lan
 
 To compile-it:
 
->
+>cowgol -o -lcowgol misc.coo tetris.cow
