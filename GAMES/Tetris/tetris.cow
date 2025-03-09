@@ -1,0 +1,356 @@
+# Micro Tetris, based on an obfuscated tetris, 1989 IOCCC Best Game
+#
+# Copyright (c) 1989  John Tromp <john.tromp@gmail.com>
+# Copyright (c) 2009-2021  Joachim Wiberg <troglobit@gmail.com>
+#
+# Adapted to HiTech C by Ladislau Szilagyi, May 2023
+# Translated to Cowgol by Ladislau Szilagyi, March 2025
+#
+# >cowgol -o -lcowgol misc.coo tetris.cow
+#
+
+include "misc.coh";
+include "libbios.coh";
+
+const ESC := 0x1B;
+const REV_BLANK := 219;
+
+sub clrscr() is
+	ConOut(ESC);
+	ConOut('[');
+	ConOut('2');
+	ConOut('J');
+	ConOut(ESC);
+	ConOut('[');
+	ConOut('1');
+	ConOut(';');
+	ConOut('1');
+	ConOut('H');
+end sub;
+
+sub gotoxy(x: uint8, y: uint8) is
+	ConOut(ESC);
+	ConOut('[');
+	putstr(itoa(y as int16));
+	ConOut(';');
+	putstr(itoa(x as int16));
+	ConOut('H');
+end sub;
+
+sub hidecursor() is
+	ConOut(ESC);
+	putstr("[?25l");
+end sub;
+
+sub showcursor() is
+	ConOut(ESC);
+	putstr("[?25h");
+end sub;
+
+# the board
+const      B_COLS := 12;
+const      B_ROWS := 24;
+const      B_SIZE := B_ROWS * B_COLS;
+
+const TL :=    -B_COLS-1;        # top left
+const TC :=    -B_COLS;          # top center 
+const TR :=    -B_COLS+1;        # top right 
+const ML :=    -1;               # middle left 
+const MR :=    1;                # middle right 
+const BL :=    B_COLS-1;         # bottom left 
+const BC :=    B_COLS;           # bottom center 
+const BR :=    B_COLS+1;         # bottom right 
+
+# These can be overridden by the user. 
+const KEY_LEFT :=   'j';
+const KEY_RIGHT :=  'l';
+const KEY_ROTATE := 'k';
+const KEY_DROP :=   ' ';
+const KEY_PAUSE :=  'p';
+const KEY_QUIT :=   'q';
+
+var buf: uint8[80];
+
+var board: uint8[B_SIZE];
+var shadow: uint8[B_SIZE];
+
+var shape: [int8];
+
+var shapes: int8[] := {
+         7, TL, TC, MR, 1,      # ""__   
+         8, TR, TC, ML, 1,      # __""   
+         9, ML, MR, BC, 1,      # "|"    
+         3, TL, TC, ML, 1,      # square 
+        12, ML, BL, MR, 1,      # |"""   
+        15, ML, BR, MR, 1,      # """|   
+        18, ML, MR,  2, 1,      # ---- sticks out 
+         0, TC, ML, BL, 1,      # /    
+         1, TC, MR, BR, 1,      # \    
+        10, TC, MR, BC, 1,      # |-   
+        11, TC, ML, MR, 1,      # _|_  
+         2, TC, ML, BC, 1,      # -|   
+        13, TC, BC, BR, 1,      # |_   
+        14, TR, ML, MR, 1,      # ___| 
+         4, TL, TC, BC, 1,      # "|   
+        16, TR, TC, BC, 1,      # |"   
+        17, TL, MR, ML, 1,      # |___ 
+         5, TC, BC, BL, 1,      # _| 
+         6, TC, BC,  2 * B_COLS, 1 # | sticks out 
+};
+
+sub next_shape(): (ret: [int8]) is
+	var n: uint16 := (xrnd() % 7) * 5;
+	ret := &shapes[n as uint8];
+end sub;
+
+sub CharIn(): (ret: int8) is
+	if ConSts() == 0xFF then
+		ret :=	ConIn() as int8;
+	else
+		ret := -1;
+	end if;
+end sub;
+
+sub draw(x: uint8, y: uint8, c: uint8) is
+        gotoxy(x, y);
+
+        if c != 0 then
+		ConOut(REV_BLANK);
+	else
+		ConOut(' '); 
+	end if;
+end sub;
+
+sub wait(): (ret: int8) is
+        var i: uint8;
+	var j: uint8;
+
+	i := 0;
+        while i < 50 loop
+		j := 0;
+                while j < 50 loop
+			ret := CharIn();
+                        if ret != -1 then
+				return;
+			end if;
+			j := j + 1;
+		end loop;
+		i := i + 1;
+	end loop;
+
+        ret := -1;
+end sub;
+
+sub update(): (ret: int8) is
+        var x: uint16;
+	var y: uint16;
+	var c: uint8;
+
+        # Display board.
+	y := 1; 
+        while y < B_ROWS - 1 loop
+		x := 0;
+                while x < B_COLS loop
+                        if board[y * B_COLS + x] != shadow[y * B_COLS + x] then
+                                c := board[y * B_COLS + x]; # color 
+                                shadow[y * B_COLS + x] := c;
+                                draw(x as uint8 + 28, y as uint8, c);
+				gotoxy(1,1);
+                        end if;
+			x := x + 1;
+                end loop;
+		y := y + 1;
+        end loop;
+
+        ret := wait();
+end sub;
+
+# Check if shape fits in the current position 
+sub fits_in(s: [int8], pos: int16): (ret: uint8) is
+	var pos1: int16;
+	var pos2: int16;
+	var pos3: int16;
+
+	s := @next s;
+	pos1 := pos + [s] as int16;
+	s := @next s;
+	pos2 := pos + [s] as int16;
+	s := @next s;
+	pos3 := pos + [s] as int16;
+
+        if board[pos as uint16] != 0 or board[pos1 as uint16] != 0 or board[pos2 as uint16] != 0 or board[pos3 as uint16] != 0 then
+                ret := 0;
+	else
+        	ret := 1;
+	end if;
+end sub;
+
+# place shape at pos with color 
+sub place(s: [int8], pos: int16, c: uint8) is
+	var posnext: int16;
+
+        board[pos as uint16] := c;
+	s := @next s;
+	posnext := pos + [s] as int16;
+        board[posnext as uint16] := c;
+	s := @next s;
+	posnext := pos + [s] as int16;
+        board[posnext as uint16] := c;
+	s := @next s;
+	posnext := pos + [s] as int16;
+        board[posnext as uint16] := c;
+end sub;
+
+sub show_online_help() is
+        gotoxy(1, 11);
+        putstr("j     - left");
+        gotoxy(1, 12);
+        putstr("k     - rotate");
+        gotoxy(1, 13);
+        putstr("l     - right");
+        gotoxy(1, 14);
+        putstr("space - drop");
+        gotoxy(1, 15);
+        putstr("p     - pause");
+        gotoxy(1, 16);
+        putstr("q     - quit");
+end sub;
+
+        var c: int8 := 0;
+	var i: uint16;
+	var j: uint16;
+	var ptr: [uint8];
+        var pos: uint16 := 17;
+        var backup: [int8];
+	var counter: int16 := 0;
+
+	BiosSetup();
+	xrndseed();
+
+	hidecursor();
+
+	i := 0;
+	while i < B_SIZE loop
+		board[i] := 0;
+		shadow[i] := 0;
+		i := i + 1;
+	end loop;
+
+        ptr := &board[0];
+	i := B_SIZE;
+        while i > 0 loop
+		if i < 25 or i % B_COLS < 2 then
+	                [ptr] := 1;
+		end if;
+		ptr := @next ptr;
+		i := i - 1;
+	end loop;
+
+        clrscr();
+        show_online_help();
+
+        gotoxy(1, 24);
+        putstr("Hit ENTER to begin playing TETRIS...");
+
+        while ConIn() != 0xD loop
+        end loop;
+
+        gotoxy(1, 24);
+        putstr("                                      ");
+
+        shape := next_shape();
+
+        loop
+		counter := counter + 1;
+
+                if c < 0 then
+                        if fits_in(shape, pos as int16 + B_COLS) != 0 then
+                                pos := pos + B_COLS;
+                        else
+                                place(shape, pos as int16, 1);
+
+				j := 0;
+                                while j < B_SIZE-2*B_COLS loop
+
+					j := j + 1;
+                                        while board[j] > 0 loop
+                                                if j % B_COLS == 10 then
+                                                        while j % B_COLS > 0 loop
+								board[j] := 0;
+								j := j - 1;
+                                                        end loop;
+
+                                                        c := update();
+
+							j := j - 1;
+                                                        while j > 0 loop
+								board[j + B_COLS] := board[j];
+								j := j - 1;
+                                                        end loop;
+
+                                                        c := update();
+                                                end if;
+						j := j + 1;
+                                        end loop;
+
+					j := B_COLS * (j / B_COLS + 1);
+                                end loop;
+
+                                shape := next_shape();
+
+				pos := 17;
+
+				if fits_in(shape, pos as int16) == 0 then
+					gotoxy(1, 22);
+					putstr("Game over!");
+					c := KEY_QUIT;
+				end if;
+                        end if;
+                end if;
+
+		if c == KEY_QUIT then
+			gotoxy(1, 23);
+			putstr("You accumulated ");
+			putstr(itoa(counter));
+			putstr(" points!");
+			break;
+                elseif c == KEY_LEFT then
+                	pos := pos - 1;
+                        if fits_in(shape, pos as int16) == 0 then
+                                pos := pos + 1;
+			end if;
+                elseif c == KEY_ROTATE then
+                        backup := shape;
+                        shape := &shapes[5 * [shape] as uint8];    # Rotate 
+
+                        # Check if it fits, if not restore shape from backup 
+                        if fits_in(shape, pos as int16) == 0 then
+                                shape := backup;
+			end if;
+                elseif c == KEY_RIGHT then
+			pos := pos + 1;
+                        if fits_in(shape, pos as int16) == 0 then
+                                pos := pos - 1;
+			end if;
+                elseif c == KEY_DROP then
+                        while fits_in(shape, pos as int16 + B_COLS) != 0 loop
+                                pos := pos + B_COLS;
+			end loop;
+                elseif c == KEY_PAUSE then
+                        # wait for another KEY_PAUSE 
+			c := 0;
+                        while c != KEY_PAUSE loop
+                                c := CharIn();
+                                if c == -1 then
+                                        continue;
+				end if;
+                        end loop;
+                end if;
+
+                place(shape, pos as int16, 1);
+                c := update();
+                place(shape, pos as int16, 0);
+        end loop;
+	
+	showcursor();
+	exit();
