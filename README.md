@@ -11,7 +11,7 @@ A small Cowgol programming language manual is included.
 
 To compile or to build an executable starting from Cowgol source files (and, optionally, C & assembler files), the following command is used:
 
-COWGOL [-C] [-Mfile] [-Lfile] [-Tfile] [-O] [-S] file1.ext ... [ filen.ext ]
+COWGOL [-C] [-Mfile] [-Lfile] [-Tfile] [-O] [-S] [-X] file1.ext ... [ filen.ext ]
 
 If the option -C is specified, the files will be only compiled/assembled.
 
@@ -28,6 +28,9 @@ The option -Tfile is used to build, when linking the final executable, a table o
 
 The option -S is used to instruct Cowlink to type a map of the Cowgol subroutines and variables used in these subroutines, with their exact addresses.
 This is also very valuable when debugging the app.
+
+The option -X is used to reserve a larger stack (1KB) for the executable (the usual stack size is 128 bytes). 
+This might be important if C code is mixed into the project.
 
 More than one source file may be specified (with extensions: .cow = cowgol source file, .c = C source file, .as = assembler source file)
 
