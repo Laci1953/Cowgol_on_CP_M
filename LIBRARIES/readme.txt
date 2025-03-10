@@ -144,3 +144,22 @@ sub xdivytofp(x: int16, y: int16): (ret: int16)
 This cowgol.lib will be used at LINK time when the option '-lcowgol' is used in the command line.
 
 See details in the folder for the game BOWLING.
+
+Combining the use of libraries
+------------------------------
+
+In any Cowgol project, it is possible to combine the use of all types of libraries already mentioned.
+
+For example, it is possible to use, in the same source file test.cow:
+
+include "libbios.coh";
+include "string.coh";
+
+, but, in the command line, you should use:
+
+>cowgol -o -lcowgol string.coo test.cow
+
+Here:
+- the 'string.coo' adds the string.coo file in the list of the files that will be used in the COWLINK line
+- the '-lcowgol' instructs LINK, at the final object code linking phase, to include the file cowgol.lib in the list of files
+
