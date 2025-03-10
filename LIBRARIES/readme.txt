@@ -104,6 +104,7 @@ sub BiosSetup()
 sub ConOut(ch: uint8)
 sub ConIn(): (ret: uint8)
 sub CosSts(): (ret: uint8)
+sub putstr(s: [uint8])
 
 (libbasic.coh)
 sub Exit()
