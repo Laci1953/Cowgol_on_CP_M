@@ -1,0 +1,9 @@
+include "misc.coh";
+
+	@asm "call _init";
+	@asm "ld hl,0";
+	@asm "push hl";
+	@asm "call _queens";
+	@asm "pop bc";
+	exit();
+
