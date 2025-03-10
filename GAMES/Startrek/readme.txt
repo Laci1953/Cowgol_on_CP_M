@@ -1,5 +1,7 @@
 The Startrek game, rewritten in the Cowgol language
 
+It works on any Z80 machine provided with a VT100 compatible terminal.
+
 It can be compiled only on Z80 machines provided with 128/512 KB RAM
 
 The st.* files are needed at run time.
