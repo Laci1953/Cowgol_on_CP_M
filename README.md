@@ -58,10 +58,13 @@ The following executables are needed:
 
 Also, the library file "cowgol.coo" must be present.
 
+
 # Folders
 ---------
 
 The EXE folder contains all the needed executables (as HEX files, ready to be LOAD-ed) and the source files for the Cowgol command line processor (cowgol.c) and for Cowfix (cowfix.c and fix.as).
+
+The 128_512_KB folder contains executables provided for computers with 128KB or 512KB computers, including those running ROMWBW.
 
 The INCLUDE folder contains cowgol include files (.coh) to be used when building cowgol-based applications.
 
