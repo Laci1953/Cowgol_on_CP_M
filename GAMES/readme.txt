@@ -1,2 +1,2 @@
-Some games, rewritten in the Cowgol language
+Some games, (re)written in the Cowgol language
 
