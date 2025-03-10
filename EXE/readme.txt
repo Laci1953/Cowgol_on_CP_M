@@ -1,6 +1,7 @@
 The executables, belonging to the Cowgol compiler (COWGOL, COWFE, COWBE, COWLINK, COWFIX).
 
 The executables from HiTech's C toolchain are also included ($EXEC, CPP, P1, CGEN, OPTIM, Z80AS, LINK, LIBR).
+(Z80AS is a better substitute for ZAS)
 
 These executables are valid for all Z80 CP/M computers provided with 64KB RAM.
 
