@@ -74,7 +74,7 @@ The EXAMPLES folder contains examples of Cowgol compilation sessions.
 
 There are more than one way to configure a Cowgol project.
 
-Variant 1: the source file contains all the needed text, no 'include' used.
+Variant 1: one source file contains all the needed statements, no 'include' used.
 
 Variant 2: there are more than one cowgol source files, using the 'external' feature (see example nr.3 in the EXAMPLES folder)
 
