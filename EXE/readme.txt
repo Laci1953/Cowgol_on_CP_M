@@ -27,6 +27,7 @@ Examples:
 Also, there are some things to be optimized in the original output from cowlink.
 
 If the -O option is used in the Cowgol command line, COWFIX will made also code optimizations, and will comment-out non-referenced labels and "dead" code. .
+If the -X option is used in the Cowgol command line, COWFIX will reserve a larger stack (1KB), instead the usual 128 bytes.
 
 Here is the complete list of the optimizations performed by Cowfix:
 
