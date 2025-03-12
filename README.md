@@ -30,7 +30,7 @@ The option -S is used to instruct Cowlink to type a map of the Cowgol subroutine
 This is also very valuable when debugging the app.
 
 The option -X is used to reserve a larger stack (1KB) for the executable (the usual stack size is 128 bytes). 
-This might be important if C code is mixed into the project.
+This might be important if reentrant C code is mixed into the project.
 
 More than one source file may be specified (with extensions: .cow = cowgol source file, .c = C source file, .as = assembler source file)
 
