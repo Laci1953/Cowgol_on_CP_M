@@ -40,7 +40,7 @@ The first source file must be a Cowgol source file.
 
 If more Cowgol source files are used, the first one will give the name of the executable being built, but the last one must contain the 'main' routine.
 
-C and assembler routines may be called from the cowgol source files.
+C and assembler routines may be called from the cowgol source files (see the folder EXAMPLES).
 
 HiTech's LINK is used to link the object files and build the final executable.
 
