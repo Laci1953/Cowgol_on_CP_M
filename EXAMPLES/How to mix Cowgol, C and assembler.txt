@@ -40,7 +40,7 @@ test1::
 
 Here, you must know the mechanism used by the HiTech's C compiler to pass values to a routine.
 
-All the routine's parameters must be stored on the stack prior to the call of he routine.
+All the routine's parameters must be stored on the stack prior to the call of the routine.
 
 Example: suppose the C routine 'test1' expects as parameters a pointer (2 bytes word) and a counter (byte):
 
