@@ -1,0 +1,71 @@
+How to mix Cowgol, C and Z80 assembler into a Cowgol project
+------------------------------------------------------------
+
+The Cowgol development environment allows Cowgol, C and Z80 assembler source files to be combined into
+a Cowgol project.
+
+Using the '@asm' feature of the Cowgol language, that's easy.
+
+The important thing to remember is that only the Cowgol source may call C and/or assembler routines.
+
+1. Calling assembler routines from Cowgol
+-----------------------------------------
+
+You will load the appropriate registers with values (taken from Cowgol variables, if necessary),
+then you will issue the 'call'.
+
+Example: suppose the assembler routine 'test1' expects a pointer (2 bytes word) in HL and a counter (byte) in A.
+
+Here is a possible Cowgol code to call this routine:
+
+	var pointer: [uint8];
+	var counter: uint8;
+
+	#... load the pointer and counter, then...
+
+	@asm "ld hl,(", pointer, ")";
+	@asm "ld a,(", counter, ")";
+	@asm "call test1";
+
+Of course, in the assembler source file, you must declare 'test1' as a 'global' label:
+
+	global test1
+
+	or, simply, using ::
+
+test1::
+
+2. Calling C routines from Cowgol
+---------------------------------
+
+Here, you must know the mechanism used by the HiTech's C compiler to pass values to a routine.
+
+All the routine's parameters must be stored on the stack prior to the call of he routine.
+
+Example: suppose the C routine 'test1' expects as parameters a pointer (2 bytes word) and a counter (byte):
+
+void test1(char* pointer, char counter);
+
+It is important to 'push' on stack the actual values in reverse order: first the counter, then the pointer:
+
+	var pointer: [uint8];
+	var counter: uint8;
+
+	#... load the pointer and counter, then...
+
+	@asm "ld a,(", counter, ")";
+	@asm "ld c,a";
+	@asm "push bc"; #counter as low byte of word being push-ed on stack
+	@asm "ld hl,(", pointer, ")";
+	@asm "push hl";
+	@asm "call _test1";
+	@asm "pop de"; #drop params
+	@asm "pop de";
+
+You noticed that we used '_test1' , not 'test1', to call the routine!
+Also, the parameters must be 'pop'-ed from the stack, after the routine returns!
+
+This is because the implementation of the HiTech's C compiler.
+
+One important thing to remember: the C routines return values are stored in the 
+registers HL (for a 2-byte values being returned), or L (for 1 byte).
