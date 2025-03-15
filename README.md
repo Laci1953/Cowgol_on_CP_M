@@ -75,7 +75,7 @@ The LIBRARIES folder contains cowgol user libraries (*.coo) to be used when buil
 
 The GAMES folder contains some computer games, rewritten in Cowgol.
 
-The EXAMPLES folder contains examples of Cowgol compilation sessions.
+The EXAMPLES folder contains examples of Cowgol compilation sessions and details related on how to mix Cowgol C and assembler.
 
 
 # The structure of the Cowgol applications
