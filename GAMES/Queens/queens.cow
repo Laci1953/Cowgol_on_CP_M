@@ -1,0 +1,71 @@
+#	Example of Cowgol calling C routines
+
+include "misc.coh";
+
+	var t: int16[8];
+	var sol: int16;
+
+sub print_solution() is
+	var i: uint8;
+	var j: uint8;
+	var crossboard: uint8[64];
+
+	i := 0;
+	while i < 8 loop
+		j := 0;
+		while j < 8 loop
+			crossboard[(j * 8) + i] := '_';
+			j := j + 1;
+		end loop;
+		i := i + 1;
+	end loop;
+
+	i := 0;
+	while i < 8 loop
+			crossboard[(t[i] as uint8 * 8) + i] := '*';
+			i := i + 1;
+	end loop;
+	
+	print("\n\nSolution ");
+	print(itoa(sol));
+	print_nl();
+	print_nl();
+	sol := sol + 1;
+
+	i := 0;
+	while i < 8 loop
+		j := 0;
+		while j < 8 loop
+			print_char(crossboard[(j * 8) + i]);
+			print_char(' ');
+			j := j + 1;
+		end loop;
+		print_nl();
+		i := i + 1;
+	end loop;
+end sub;
+
+# main
+
+	t[0] := -1;
+	sol := 1;
+
+	# call init(&t, &print_solution)
+
+	# args in reverse order...
+	@asm "ld hl,", print_solution;
+	@asm "push hl";
+	@asm "ld hl,", t;
+	@asm "push hl";
+	@asm "call _init";
+	@asm "pop bc";
+	@asm "pop bc";
+
+	# call queens(0)
+
+	@asm "ld hl,0";
+	@asm "push hl";
+	@asm "call _queens";
+
+	exit();
+
