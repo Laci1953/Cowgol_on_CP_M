@@ -6,8 +6,6 @@ a Cowgol project.
 
 Using the '@asm' feature of the Cowgol language, that's easy.
 
-The important thing to remember is that only the Cowgol source may call C and/or assembler routines.
-
 1. Calling assembler routines from Cowgol
 -----------------------------------------
 
@@ -69,3 +67,36 @@ This is because the implementation of the HiTech's C compiler.
 
 One important thing to remember: the C routines return values are stored in the 
 registers HL (for a 2-byte values being returned), or L (for 1 byte).
+
+3. Calling Cowgol subroutines from C
+------------------------------------
+
+From a C source file, it is possible to call a Cowgol subroutine.
+
+The main constraint is that the Cowgol subroutine must not have any parameter and must not return any value.
+
+First, from the Cowgol source file, we pass to a C routine a pointer to the Cowgol subroutine:
+
+sub MyRoutine() is
+...
+end sub;
+
+	@asm "ld hl,", MyRoutine;
+	@asm "push hl";
+	@asm "call _init";	#calling the C routine 'init'
+	@asm "pop bc";
+
+In the C source, we declare:
+
+void (*fp)(void);
+
+void init(void (*fpinit)(void))
+{
+	fp = fpinit;
+}
+
+Then, in the C source file, we can call the Cowgol routine simply by:
+
+	fp();
+
+See the game 'Queens'.
