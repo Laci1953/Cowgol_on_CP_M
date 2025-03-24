@@ -1,6 +1,7 @@
 Examples of Cowgol compilation
 
 Example nr.1. Hexdump (building HEXDUMP.COM from its source file, then using the new executable)
+------------------------------------------------------------------------------------------------
 
 c>cowgol -m hexdump.cow
 COWGOL COMPILER (CP/M-80) V2.0
@@ -167,6 +168,7 @@ c>hexdump io.h
 00000200
 
 Example nr.2. Calling an assembler routine from a Cowgol source file
+--------------------------------------------------------------------
 
 c>type rand.as
 ; Xorshift is a class of pseudorandom number generators discovered
@@ -275,7 +277,9 @@ ERA $$EXEC.$$$
 
 c>
 
-Example nr.3. Building an executable containing 2 cowgol files and an assembler file 
+Example nr.3. Building an executable containing 2 cowgol files and an assembler file
+------------------------------------------------------------------------------------
+
 (testing 'external' cowgol language feature and calling assembler routine)
 
 c>cowgol one.cow two.cow rand.as
@@ -342,6 +346,7 @@ ERA $$EXEC.$$$
 c>
 
 Example nr.4. An application made from Cowgol, C & assembler
+------------------------------------------------------------
 
 ################################
 #        Cowgol program        #
@@ -495,7 +500,9 @@ Array:
 2934,3034,3334,3369,3479,3718,3906,3994,4428,4834,5052,5166,5269,5515,5556,27074,27423,27516,27580,27746,27759,27978,28064,29236,29475,29604,30556,30984,31163,31335,31347,31440,31704,31831,31852,31973,32612,
 c>
 
-Example nr.5. Compiling a Cowgol source file (testmem.cow) with optimization option (-O), 
+Example nr.5.
+-------------
+Compiling a Cowgol source file (testmem.cow) with optimization option (-O), 
 adding a cowgol object file (alloc.coo) in the list of files to be used in COWLINK, 
 and adding an object file (xrnd.obj) in the list of files linked by LINK into the executable.
 
@@ -554,6 +561,7 @@ ERA $$EXEC.$$$
 D>
 
 Example nr.6 Compiling STARTREK using the .coo libraries
+--------------------------------------------------------
 
 D>cowgol -o misc.coo string.coo seqfile.coo startrek.cow
 COWGOL COMPILER (CP/M-80) V2.0
@@ -675,6 +683,7 @@ ERA $$EXEC.$$$
 D>
 
 Example nr.7 Compiling using cowgol.lib
+---------------------------------------
 
 I>type t.cow
 include "libconio.coh";
@@ -729,6 +738,7 @@ hello!
 I>
 
 Example nr.8 Compiling using misc.coo
+-------------------------------------
 
 I>type t.cow
 include "misc.coh";
@@ -777,3 +787,53 @@ ERA $$EXEC.$$$
 I>t
 hello!
 I>
+
+Example nr.9 A recursive Cowgol subroutine
+------------------------------------------
+
+Of course, we are cheating, by using @asm :)
+
+Here is the source file: (fact.cow)
+------------------------
+include "misc.coh";
+
+var fp: int16;
+
+sub factorial(n: int16): (ret: int16) is
+	var tmp: int16;
+
+	if n == 1 then
+		ret := 1;
+	else
+		# ret := n * factorial(n - 1);
+		@asm "ld hl,(", n, ")";
+		@asm "push hl";
+		n := n - 1;
+		@asm "ld hl,(", n, ")";
+		@asm "ld ix,(", fp, ")";
+		@asm "ld de, 1f";
+		@asm "push de";
+		@asm "jp (ix)";
+		@asm "1:";
+		@asm "ld (", tmp, "),hl"; #tmp = factorial(n-1)
+		@asm "pop hl";
+		@asm "ld (", n, "),hl";
+		ret := n * tmp;
+	end if;
+end sub;
+
+#setup pointer to factorial
+@asm "ld hl,", factorial;
+@asm "ld (", fp, "),hl";
+
+print_i16(factorial(5));
+--------------------------
+
+To compile:
+>cowgol -o -x misc.coo fact.cow
+
+It works!
+
+C>fact
+120
+C>
