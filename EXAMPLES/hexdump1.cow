@@ -1,0 +1,409 @@
+sub Exit() is
+	@asm "rst 0";
+end sub;
+
+sub ExitWithError() is
+	@asm "rst 0";
+end sub;
+
+sub print_char(c: uint8) is
+	if c == 10 then
+		@asm "ld e, 13";
+		@asm "ld c, 2";
+		@asm "call 5";
+	end if;
+	@asm "ld a, (", c, ")";
+	@asm "ld e, a";
+	@asm "ld c, 2";
+	@asm "call 5";
+end sub;
+
+sub print(ptr: [uint8]) is
+    loop
+        var c := [ptr];
+        if c == 0 then
+            return;
+        end if;
+        print_char(c);
+        ptr := ptr + 1;
+    end loop;
+end sub;
+
+sub print_hex_i8(value: uint8) is
+    var i: uint8 := 2;
+    loop
+        var digit := value >> 4;
+        if digit < 10 then
+            digit := digit + '0';
+        else
+            digit := digit + ('a' - 10);
+        end if;
+        print_char(digit);
+        value := value << 4;
+        i := i - 1;
+        if i == 0 then
+            break;
+        end if;
+    end loop;
+end sub;
+
+sub print_hex_i16(value: uint16) is
+    print_hex_i8((value >> 8) as uint8);
+    print_hex_i8(value as uint8);
+end sub;
+
+sub print_hex_i32(value: uint32) is
+    print_hex_i8((value >> 24) as uint8);
+    print_hex_i8((value >> 16) as uint8);
+    print_hex_i8((value >> 8) as uint8);
+    print_hex_i8(value as uint8);
+end sub;
+
+var argv_pointer: [uint8];
+
+sub ArgvInit() is
+	argv_pointer := 0x81 as [uint8];
+	[argv_pointer + [0x80 as [uint8]] as intptr] := 0;
+end sub;
+
+# Returns null is there's no next argument.
+sub ArgvNext(): (arg: [uint8]) is
+	# No more arguments?
+
+	if argv_pointer == (0 as [uint8]) then
+		arg := argv_pointer;
+		return;
+	end if;
+
+	# Skip leading whitespace.
+
+	var c: uint8;
+	loop
+		c := [argv_pointer];
+		if c != ' ' then
+			break;
+		end if;
+		argv_pointer := argv_pointer + 1;
+	end loop;
+
+	arg := argv_pointer;
+
+	# Skip to end of word and terminate.
+
+	loop
+		c := [argv_pointer];
+		if (c == ' ') or (c == '\n') or (c == 0) then
+			break;
+		end if;
+		argv_pointer := argv_pointer + 1;
+	end loop;
+	[argv_pointer] := 0;
+
+	if c == ' ' then
+		argv_pointer := argv_pointer + 1;
+	else
+		argv_pointer := 0 as [uint8];
+	end if;
+end sub;
+
+sub MemSet(buf: [uint8], byte: uint8, len: uint16) is
+	var bufend := buf + len;
+	loop
+		if buf == bufend then
+			return;
+		end if;
+		[buf] := byte;
+		buf := buf + 1;
+	end loop;
+end sub;
+
+record CpmFCB is
+	dr: uint8;
+	f: uint8[11];
+	ex: uint8;
+	s1: uint8;
+	s2: uint8;
+	rc: uint8;
+	d: uint8[16];
+	cr: uint8;
+	r: uint16;
+	r2: uint8;
+end record;
+
+record FCB is
+	bufferptr: uint8; # byte just read
+	dirty: uint8;
+	cpm: CpmFCB;
+	buffer: uint8[128];
+end record;
+
+sub file_i_init(fcb: [FCB], filename: [uint8]) is
+	sub fill(dest: [uint8], src: [uint8], len: uint8): (srcout: [uint8]) is
+		loop
+			var c := [src];
+			if (c < 32) or (c == '.') then
+				c := ' ';
+			elseif (c == '*') then
+				c := '?';
+			else
+				src := src + 1;
+			end if;
+			if (c >= 'a') and (c <= 'z') then
+				c := c - ('a' - 'A');
+			end if;
+			[dest] := c;
+			dest := dest + 1;
+
+			len := len - 1;
+			if len == 0 then
+				break;
+			end if;
+		end loop;
+		srcout := src;
+	end sub;
+
+	MemSet(fcb as [uint8], 0, @bytesof FCB);
+	MemSet(&fcb.cpm.f[0] as [uint8], ' ', 11);
+	filename := fill(&fcb.cpm.f[0], filename, 8);
+
+	var c: uint8;
+	loop
+		c := [filename];
+		if (c < 32) or (c == '.') then
+			break;
+		end if;
+		filename := filename + 1;
+	end loop;
+
+	if c == '.' then
+		filename := fill(&fcb.cpm.f[8], filename+1, 3);
+	end if;
+
+	fcb.cpm.r := 0xffff;
+	fcb.bufferptr := 127;
+end sub;
+
+sub fcb_i_gbpb(fcb: [FCB], c: uint8) is
+	var cpmfcb := &fcb.cpm;
+	var dma := &fcb.buffer[0];
+
+	@asm "ld c, 26"; # SET DMA
+	@asm "ld de, (", dma, ")";
+	@asm "call 5";
+
+	@asm "ld a, (", c, ")";
+	@asm "ld c, a";
+	@asm "ld de, (", cpmfcb, ")";
+	@asm "call 5";
+end sub;
+
+sub fcb_i_blockin(fcb: [FCB]) is
+	MemSet(&fcb.buffer[0], 0, 128);
+	fcb_i_gbpb(fcb, 33); # READ RANDOM
+	fcb.dirty := 0;
+end sub;
+
+sub fcb_i_blockout(fcb: [FCB]) is
+	if fcb.dirty != 0 then
+		fcb_i_gbpb(fcb, 34); # WRITE RANDOM
+		fcb.dirty := 0;
+	end if;
+end sub;
+
+sub fcb_i_changeblock(fcb: [FCB], newblock: uint16) is
+	if newblock != fcb.cpm.r then
+		fcb_i_blockout(fcb);
+		fcb.cpm.r := newblock;
+		fcb_i_blockin(fcb);
+	end if;
+end sub;
+
+sub fcb_i_convert_a_to_error() is
+	@asm "cp 0xff";
+	@asm "ld a, 0";
+	@asm "ret nz";
+	@asm "inc a";
+end sub;
+
+sub FCBOpenIn(fcb: [FCB], filename: [uint8]): (errno: uint8) is
+	file_i_init(fcb, filename);
+
+	var cpmfcb := &fcb.cpm;
+	@asm "ld c, 15"; # OPEN_FILE
+	@asm "ld de, (", cpmfcb, ")";
+	@asm "call 5";
+	@asm "call", fcb_i_convert_a_to_error;
+	@asm "ld (", errno, "), a";
+end sub;
+
+sub FCBOpenUp(fcb: [FCB], filename: [uint8]): (errno: uint8) is
+	(errno) := FCBOpenIn(fcb, filename);
+end sub;
+
+sub FCBOpenOut(fcb: [FCB], filename: [uint8]): (errno: uint8) is
+	file_i_init(fcb, filename);
+
+	var cpmfcb := &fcb.cpm;
+	@asm "ld c, 19"; # DELETE_FILE
+	@asm "ld de, (", cpmfcb, ")";
+	@asm "call 5";
+
+	@asm "ld c, 22"; # CREATE_FILE
+	@asm "ld de, (", cpmfcb, ")";
+	@asm "call 5";
+	@asm "call", fcb_i_convert_a_to_error;
+	@asm "ld (", errno, "), a";
+end sub;
+	
+sub FCBClose(fcb: [FCB]): (errno: uint8) is
+	fcb_i_blockout(fcb);
+
+	var cpmfcb := &fcb.cpm;
+	@asm "ld c, 16"; # CLOSE_FILE
+	@asm "ld de, (", cpmfcb, ")";
+	@asm "call 5";
+	@asm "call", fcb_i_convert_a_to_error;
+	@asm "ld (", errno, "), a";
+end sub;
+
+sub FCBSeek(fcb: [FCB], pos: uint32) is
+	pos := pos - 1; # seek to *previous* character
+	var newblock := (pos >> 7) as uint16;
+	var newptr := (pos as uint8) & 127;
+	fcb_i_changeblock(fcb, newblock);
+	fcb.bufferptr := newptr;
+end sub;
+
+sub FCBPos(fcb: [FCB]): (pos: uint32) is
+	pos := (((fcb.cpm.r as uint32) << 7) | (fcb.bufferptr as uint32)) + 1;
+end sub;
+
+sub FCBExt(fcb: [FCB]): (len: uint32) is
+	var oldblock := fcb.cpm.r;
+	var cpmfcb := &fcb.cpm;
+
+	@asm "ld c, 16"; # CLOSE_FILE (actually flushing it to disk)
+	@asm "ld de, (", cpmfcb, ")";
+	@asm "call 5";
+
+	@asm "ld c, 35"; # COMPUTE FILE SIZE
+	@asm "ld de, (", cpmfcb, ")";
+	@asm "call 5";
+
+	len := ([&fcb.cpm.r as [uint32]] & 0x00ffffff) << 7;
+	fcb.cpm.r := oldblock;
+end sub;
+
+sub fcb_i_nextchar(fcb: [FCB]) is
+	fcb.bufferptr := fcb.bufferptr + 1;
+	if fcb.bufferptr == 128 then
+		fcb_i_changeblock(fcb, fcb.cpm.r + 1);
+		fcb.bufferptr := 0;
+	end if;
+end sub;
+
+sub FCBGetChar(fcb: [FCB]): (c: uint8) is
+	fcb_i_nextchar(fcb);
+	c := fcb.buffer[fcb.bufferptr];
+end sub;
+
+sub FCBPutChar(fcb: [FCB], c: uint8) is
+	fcb_i_nextchar(fcb);
+	fcb.buffer[fcb.bufferptr] := c;
+	fcb.dirty := 1;
+end sub;
+
+
+var InputFile: FCB;
+
+var addr: uint32;
+var len: uint32;
+
+sub Hexdump() is
+	var buf: uint8[16];
+	var i: uint8;
+	var j: uint8;
+
+	print_hex_i32(addr);
+	print("  ");
+
+	i := 0;
+
+	loop
+		var c: uint8 := FCBGetChar(&InputFile);
+
+		buf[i] := c;
+		print_hex_i8(c);
+		print(" ");
+		if i == 7 then
+			print(" ");
+		end if;
+
+		i := i + 1;
+		len := len - 1;
+
+		if len == 0 or i > 15 then
+			break;
+		end if;
+	end loop;
+
+	addr := addr + (i as uint32);
+
+	var k: uint8 := i;
+	if len == 0 then
+		if i < 8 then
+			print(" ");
+		end if;
+
+		while i < 16 loop
+			print("   ");
+			buf[i] := ' ';
+			i := i + 1;
+		end loop;
+	end if;
+
+	print(" |");
+
+	j := 0;
+
+	while j < k loop
+		if buf[j] >= 0x20 and buf[j] <= 0x7e then
+			print_char(buf[j]);
+		else
+			print_char('.');
+		end if;
+
+		j := j + 1;
+	end loop;
+
+	print("|\n");
+end sub;
+
+ArgvInit();
+
+var FileName: [uint8] := ArgvNext();
+
+if FileName == (0 as [uint8]) then
+	print("usage: hexdump file\n");
+	ExitWithError();
+end if;
+
+if FCBOpenIn(&InputFile, FileName) != 0 then
+	print("hexdump: cannot open ");
+	print(FileName);
+	print("\n");
+	ExitWithError();
+end if;
+
+addr := 0;
+len := FCBExt(&InputFile);
+while len > 0 loop 
+	Hexdump();
+end loop;
+
+print_hex_i32(addr);
+print("\n");
+
+if FCBClose(&InputFile) != 0 then
+	ExitWithError();
+end if;
