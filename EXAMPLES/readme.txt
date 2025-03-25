@@ -277,75 +277,7 @@ ERA $$EXEC.$$$
 
 c>
 
-Example nr.3. Building an executable containing 2 cowgol files and an assembler file
-------------------------------------------------------------------------------------
-
-(testing 'external' cowgol language feature and calling assembler routine)
-
-c>cowgol one.cow two.cow rand.as
-COWGOL COMPILER (CP/M-80) V2.0
-Copyright (C) David Given
-ONE.COW
-0:COWFE     ONE.COW $CTMP1.$$$
-COWFE: 18kB free
-  > ONE.COW
-done: 18kB free
-0:COWBE $CTMP1.$$$ ONE.COO
-COWBE: 22kB free
-__main
-done: 21kB free
-TWO.COW
-0:COWFE     TWO.COW $CTMP1.$$$
-COWFE: 18kB free
-  > TWO.COW
-done: 17kB free
-0:COWBE $CTMP1.$$$ TWO.COO
-COWBE: 22kB free
-__main
-External
-done: 21kB free
-RAND.AS
-0:Z80AS -J -ORAND.OBJ RAND.AS
-Z80AS Macro-Assembler V4.8
-
-Errors: 0
-Finished.
-ERA $CTMP1.$$$
-ERA $CTMP2.$$$
-0:COWLINK COWGOL.COO ONE.COO TWO.COO -o $CTMP1.$$$
-COWLINK: 46kB free
-Adding input file: COWGOL.COO
-Adding input file: ONE.COO
-Adding input file: TWO.COO
-Analysing...
-Workspace sizes:
-  #0: 1 bytes
-  #1: 0 bytes
-  #2: 0 bytes
-  #3: 0 bytes
-Creating output file: $CTMP1.$$$
-Copying from input file: COWGOL.COO
-Copying from input file: ONE.COO
-Copying from input file: TWO.COO
-done: 42kB free
-ERA ONE.COO
-ERA TWO.COO
-0:COWFIX $CTMP1.$$$ $CTMP2.$$$
-0:Z80AS -J -N -O$CTMP1.$$$ $CTMP2.$$$
-Z80AS Macro-Assembler V4.8
-
-Errors: 0
-Finished.
-0:LINK -Z -Ptext=100H,data,bss -C100H -OONE.COM $CTMP1.$$$   RAND.OBJ
-ERA $CTMP1.$$$
-ERA $CTMP2.$$$
-ERA RAND.OBJ
-ERA TWO.COO
-ERA $$EXEC.$$$
-
-c>
-
-Example nr.4. An application made from Cowgol, C & assembler
+Example nr.3. An application made from Cowgol, C & assembler
 ------------------------------------------------------------
 
 ################################
@@ -382,7 +314,7 @@ Exit();
 
 Compilation:
 
-c>cowgol -lc dynmsort.cow merges.c rand.as
+c>cowgol -Llibc -O dynmsort.cow merges.c rand.as
 COWGOL COMPILER (CP/M-80) V2.0
 Copyright (C) David Given
 DYNMSORT.COW
@@ -500,7 +432,7 @@ Array:
 2934,3034,3334,3369,3479,3718,3906,3994,4428,4834,5052,5166,5269,5515,5556,27074,27423,27516,27580,27746,27759,27978,28064,29236,29475,29604,30556,30984,31163,31335,31347,31440,31704,31831,31852,31973,32612,
 c>
 
-Example nr.5.
+Example nr.4.
 -------------
 Compiling a Cowgol source file (testmem.cow) with optimization option (-O), 
 adding a cowgol object file (alloc.coo) in the list of files to be used in COWLINK, 
@@ -560,7 +492,7 @@ ERA $$EXEC.$$$
 
 D>
 
-Example nr.6 Compiling STARTREK using the .coo libraries
+Example nr.5 Compiling STARTREK using the .coo libraries
 --------------------------------------------------------
 
 D>cowgol -o misc.coo string.coo seqfile.coo startrek.cow
@@ -682,7 +614,7 @@ ERA $$EXEC.$$$
 
 D>
 
-Example nr.7 Compiling using cowgol.lib
+Example nr.6 Compiling using cowgol.lib
 ---------------------------------------
 
 I>type t.cow
@@ -737,7 +669,7 @@ I>t
 hello!
 I>
 
-Example nr.8 Compiling using misc.coo
+Example nr.7 Compiling using misc.coo
 -------------------------------------
 
 I>type t.cow
@@ -788,7 +720,7 @@ I>t
 hello!
 I>
 
-Example nr.9 A recursive Cowgol subroutine
+Example nr.8 A recursive Cowgol subroutine
 ------------------------------------------
 
 Of course, we are cheating, by using @asm :)
