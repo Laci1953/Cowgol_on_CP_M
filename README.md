@@ -420,7 +420,7 @@ That is caused by the small amount of RAM memory available to the compiler to st
 
 For sources larger than a few hundred lines, the first step of the compiler issuess a fatal error message: "Out of memory".
 
-I solved the problem, at least for the Z80-based computers provided with 128/512 KB RAM, including computers running CP/M under ROMWBW.
+I solved the problem, at least for the Z80-based computers provided with 128/512 KB RAM, including computers running CP/M under ROMWBW (version >= 3.5.0).
 
 I modified the first step of the compiler (COWFE.COM), enabling-it to store part of the data on the "extended" RAM space, beyond the "main" 64KB.
 
