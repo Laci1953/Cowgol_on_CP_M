@@ -1,6 +1,6 @@
 Here are the necessary steps, depending on your specific Z80 computer's hardware:
 
-0. For Z80ALL or ROMWBW based computers, go to step 3.
+0. For Z80ALL or ROMWBW (version >= 3.5.0)based computers, go to step 3.
 
 1. The boot (E)EPROM
 
