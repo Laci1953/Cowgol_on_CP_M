@@ -20,7 +20,7 @@ D>startrek
 
 
 
-Do you need instructions (y/Y=YES):
+Do you need instructions (y/Y=YES): n
 
 
 
