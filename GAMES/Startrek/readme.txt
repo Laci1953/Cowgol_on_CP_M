@@ -6,7 +6,7 @@ It can be compiled only on Z80 machines provided with 128/512 KB RAM
 
 The st.* files are needed at run time.
 
-D>cowgol -o misc.coo string.coo seqfile.coo startrek.cow
+D>cowgol -o misc.coo string.coo seqfile.coo startrek.cow starmain.cow
 ...
 D>startrek
 
