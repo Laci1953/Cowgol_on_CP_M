@@ -1,7 +1,7 @@
 # Cowgol_on_CP_M
 Cowgol, C & assembler development environment hosted on Z80 computers running CP/M
 -------------------------------------------------------------------
-(updated on 19 May, 2025 - fixed a bug in COWFIX, occuring when more than one return value for a sub)
+(updated on 19 May, 2025 - fixed a bug in COWFIX, occuring when more than one return value is used for a sub)
 (updated on March, 2025 - aligned to the last version found on the Cowgol site, see below)
 
 You will find here a complete Cowgol development environment, hosted on CP/M, for Z80 computers.
