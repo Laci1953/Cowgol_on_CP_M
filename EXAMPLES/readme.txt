@@ -769,3 +769,8 @@ It works!
 C>fact
 120
 C>
+
+Example nr. 9 Binary editor
+---------------------------
+
+See folder BE
