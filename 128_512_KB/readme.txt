@@ -1,4 +1,4 @@
-Here you will find an enhanced COWGOL compiler, to be used on Z80 computers provided with 128/512 KB RAM, able to compile larger COWGOL source files, compared with the original version of the compiler.
+Here you will find an enhanced COWGOL compiler, to be used on Z80 computers provided with 128/512 KB RAM, including RomWBW, able to compile larger COWGOL source files, compared with the original version of the compiler.
 
 Only the Cowfe executable was modified.
 
