@@ -11,7 +11,8 @@ cowfeall -Z80ALL (which has 4 x 32KB RAM) or
 cowfes80 -Simple80 (2 x 64KB RAM) or
 cowfewbw -ROMWBW on 512KB RAM Z80 systems (version >= 3.5.0)
 
-For RC2014 or RCBUS 128KB RAM systems, the CP/M must be setup using one of the files from the folder PutSys ( https://github.com/Laci1953/RC2014-CPM/tree/main/PutSys )
+For RC2014 or RCBUS 128KB RAM systems, the CP/M must be setup using one of the files from the folder PutSys
+( https://github.com/Laci1953/RC2014-CPM/tree/main/PutSys )
 This is necessary because of the "shadow code", that must be stored to high RAM address space.
 
 The results are spectacular.
