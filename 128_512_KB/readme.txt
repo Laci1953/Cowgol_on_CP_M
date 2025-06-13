@@ -1,4 +1,5 @@
-Here you will find an enhanced COWGOL compiler, to be used on Z80 computers provided with 128/512 KB RAM, including RomWBW, able to compile larger COWGOL source files, compared with the original version of the compiler.
+Here you will find an enhanced COWGOL compiler, to be used on Z80 computers provided with 128/512 KB RAM, including RomWBW,
+able to compile larger COWGOL source files, compared with the original version of the compiler.
 
 Only the Cowfe executable was modified.
 
@@ -17,4 +18,5 @@ The results are spectacular.
 
 Large COWGOL source files can now be compiled, without any problem.
 
-The "error_messages.txt" file contains an index of the error messages issued by the compiler (the compiler will only indicate the index# of the error...).
+The "error_messages.txt" file contains an index of the error messages issued by the compiler 
+(the compiler will only indicate the index# of the error...).
