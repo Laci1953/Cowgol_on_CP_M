@@ -482,6 +482,6 @@ The full cowgol toolchain will be executed, followed by assembling the resulting
 I opted to use as support the HiTech's toolchain, because the HiTech source files were available and I had a good enough expertise in using the HiTech tools. 
 Therefore, the output of COWLINK (after passing through a preliminary filter) is assembled by Z80AS (a substitute for ZAS, the original HiTech Z80 assembler), then the object file is processed by LINK, to obtain as a final result the .COM file.
 
-(updated on March, 2025 - aligned to the last version found on the Cowgol site, see below)
+(updated on March, 2025 - aligned to the last version found on the Cowgol site)
 
 (updated on 19 May, 2025 - fixed a bug in COWFIX, occuring when more than one return value is used for a sub)
