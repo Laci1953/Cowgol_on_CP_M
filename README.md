@@ -8,6 +8,8 @@ Cowgol is a programming language for very small systems, including Z80 computers
 
 A small Cowgol programming language manual is included.
 
+Also, a small User manual for this development environment is included.
+
 To compile or to build an executable starting from Cowgol source files (and, optionally, C & assembler files), the following command is used:
 
 COWGOL [-C] [-Mfile] [-Lfile] [-Tfile] [-O] [-S] [-X] file1.ext ... [ filen.ext ]
