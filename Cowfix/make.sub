@@ -1,0 +1,1 @@
+cowgol -o -llibc misc.coo seqfile.coo cowfix.cow searchjp.c
