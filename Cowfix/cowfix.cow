@@ -1467,7 +1467,7 @@ sub CheckLine(s: [uint8]): (ret: uint8) is
     return;
   end if;
 
-  p := strstr(s, "\tjr ");
+  p := strstr(s, "\tjr ");  # (in cowgol.coo, the jr $+3 is prefixed by BLANKS...)
   if p != nil then		#jr ---> jp
     p := p + 2;
     [p] := 'p';
@@ -2220,6 +2220,7 @@ end if;
 
 @asm "ld hl,0";		#mark NO ERRS
 @asm "ld (80h),hl";
+
 
 
 
