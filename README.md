@@ -488,7 +488,7 @@ Therefore, the output of COWLINK (after passing through a preliminary filter) is
 
 (updated on 19 May, 2025 - fixed a bug in COWFIX, occuring when more than one return value is used for a sub)
 
-(updated on 10 Sept, 2025 - corrected a bug in COWFIX, added COWFIX statistics)
+(updated on 10 Sept, 2025 - optimized COWFIX, added COWFIX statistics)
 
 Sample of COWFIX statistics ( when compiling the Adventure game):
 
