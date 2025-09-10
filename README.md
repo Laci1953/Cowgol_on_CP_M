@@ -492,20 +492,20 @@ Therefore, the output of COWLINK (after passing through a preliminary filter) is
 
 Sample of COWFIX statistics ( when compiling the Adventure game):
 
-COWFIX v15 fixing syntax and optimizing code
-PASS 1
-PASS 2
-PASS 3
-32 fixed PUSH statements
-23 fixed POP statements
-1032 fixed JR statements
-581 fixed DWORD statements
-103 fixed too long DB statements
-862 not needed labels dropped
-88 RET statements added
-58 fixed JP to JP statements
-15 fixed statement groups involving conditionals
-28 dropped not needed LD statements
-
-13707 input source lines processed
-DONE!
+ COWFIX v15 fixing syntax and optimizing code
+ PASS 1
+ PASS 2
+ PASS 3
+ 32 fixed PUSH statements
+ 23 fixed POP statements
+ 1032 fixed JR statements
+ 581 fixed DWORD statements
+ 103 fixed too long DB statements
+ 862 not needed labels dropped
+ 88 RET statements added
+ 58 fixed JP to JP statements
+ 15 fixed statement groups involving conditionals
+ 28 dropped not needed LD statements
+ 
+ 13707 input source lines processed
+ DONE!
