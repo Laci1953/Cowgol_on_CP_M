@@ -495,7 +495,7 @@ Sample of COWFIX statistics ( when compiling the Adventure game):
  	COWFIX v15 fixing syntax and optimizing code
  	PASS 1
  	PASS 2
-	 PASS 3
+	PASS 3
  	32 fixed PUSH statements
  	23 fixed POP statements
  	1032 fixed JR statements
