@@ -1,0 +1,4 @@
+xsub
+link
+-n -ptext=100h,bss,top -c100h -dt.sym -ot.com \
+c1.obj c2.obj c3.obj c4.obj c5.obj cowalloc.obj

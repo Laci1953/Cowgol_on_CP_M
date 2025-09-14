@@ -1,0 +1,70 @@
+TRACE		equ	0
+TRACE_OUT	equ	0
+CHECK_TYPE	equ	0
+
+SYMBOL_TYPE	equ	0F1H
+TYPE_TYPE	equ	0F2H
+NODE_TYPE	equ	0F3H
+SUBR_TYPE	equ	0F4H
+STRING_TYPE	equ	0F5H
+VARDATA_TYPE	equ	0F6H
+;
+;	Structures & offsets
+;
+; Symbol
+
+SYMBOL_SIZE	equ 11
+
+S_base		equ 0
+S_name		equ 4
+S_namespace	equ 6
+S_next		equ 8
+S_kind		equ 10
+
+; Type
+
+TYPE_SIZE	equ 17
+
+T_base		equ 0
+T_symbol	equ 7
+T_pointerto	equ 9
+T_width		equ 11
+T_stride	equ 13
+T_kind		equ 15
+T_alignment	equ 16
+
+; Node
+
+NODE_SIZE	equ 14
+
+N_base		equ 0
+N_type		equ 7
+N_left		equ 9
+N_right		equ 11
+N_op		equ 13
+
+; Subroutine
+
+SUBR_SIZE	equ 29
+
+U_namespace	equ 0
+U_symbol	equ 6
+U_parent	equ 8
+U_type		equ 10
+U_intfsubr	equ 12
+U_id		equ 14
+U_workspace	equ 16
+U_arch		equ 24
+U_numi		equ 26
+U_numo		equ 27
+U_flags		equ 28
+
+; Vardata
+
+VARDATA_SIZE	equ 9
+
+V_type		equ 0
+V_subr		equ 2
+V_nextparam	equ 4
+V_offset	equ 6
+V_wsid		equ 8
