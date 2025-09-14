@@ -1,0 +1,350 @@
+include "cowgol.coh";
+include "argv.coh";
+include "strings.coh";
+include "malloc.coh";
+include "file.coh";
+
+typedef string is [uint8];
+typedef Size is uint16;
+
+include "lcoodecl.coh";
+include "ltypes.coh";
+include "utils.coh";
+include "lemitter.coh";
+include "archlink.coh";
+include "cooread.coh";
+include "streams.coh";
+include "asmwrite.coh";
+include "graph.coh";
+
+print("COWLINK: ");
+print_i16((GetFreeMemory() >> 10) as uint16);
+print("kB free\n");
+
+var coos: [Coo] := 0 as [Coo];
+var firstCoo: [Coo] := 0 as [Coo];
+var outputFilename: [uint8] := 0 as [uint8];
+var mainSubroutine: [Subroutine] := 0 as [Subroutine];
+var mostRecentSubroutine: [Subroutine] := 0 as [Subroutine];
+
+sub SyntaxError() is
+	SimpleError("Syntax error\n");
+end sub;
+
+sub AddInputFile(filename: [uint8]) is
+	print("Adding input file: ");
+	print(filename);
+	print_nl();
+
+	var coo := OpenAndLoadCoo(filename);
+	if firstCoo == (0 as [Coo]) then
+		firstCoo := coo;
+		coos := coo;
+	else
+		coos.next := coo;
+		coos := coo;
+	end if;
+
+	var thisMain := [FindSub(coo, 0)];
+	if thisMain != (0 as [Subroutine]) then
+		if mainSubroutine == (0 as [Subroutine]) then
+			mainSubroutine := thisMain;
+		end if;
+	end if;
+	if mostRecentSubroutine != (0 as [Subroutine]) then
+		AddRef(mostRecentSubroutine, thisMain);
+	end if;
+	mostRecentSubroutine := thisMain;
+end sub;
+
+var symbols: uint8 := 0;
+
+ArgvInit();
+loop
+	var arg := ArgvNext();
+	if arg == (0 as [uint8]) then
+		break;
+	end if;
+
+	if (StrICmp(arg, "-o") == 0) then
+		outputFilename := ArgvNext();
+	elseif (StrICmp(arg, "-s") == 0) then	
+		symbols := 1;			# -S : symbols map		
+	elseif [arg] == '-' then
+		SyntaxError();
+	else
+		AddInputFile(arg);
+	end if;
+end loop;
+
+if mainSubroutine == 0 as [Subroutine] then
+	SimpleError("No main subroutine in any coofile");
+end if;
+if outputFilename == 0 as [uint8] then
+	SimpleError("No output filename specified");
+end if;
+
+print("Analysing...\n");
+ResolveExternals();
+PlaceSubroutines(mainSubroutine);
+
+# --------- symbols map ----------------------------------------
+
+record SymOff is
+	name: [uint8];
+	off: uint16;
+	next: [SymOff];
+end record;
+
+record SubSyms is
+	name: [uint8];
+	syms: [SymOff];
+	next: [SubSyms];
+end record;
+
+var subsyms: [SubSyms] := 0 as [SubSyms];
+
+var buf: uint8[64];	#should be enough...
+
+var subsyms_file: FCB;
+
+sub I_b16(): (b: uint16) is
+	b := FCBGetChar(&subsyms_file) as uint16;
+	b := b | (FCBGetChar(&subsyms_file) as uint16 << 8);
+end sub;
+
+# to read subroutine name
+# returns StrLen+1
+sub I_str0(): (len: uint16) is
+	var pbuf: [uint8];
+	var char: uint8;
+	var counter: uint8;
+
+	pbuf := &buf[0];
+
+	char := FCBGetChar(&subsyms_file);
+
+	if char == 0 then
+		# keep reading to detect possible appended data
+
+		counter := 129;		# 128 bytes record + one byte
+		while counter > 0 loop
+			char := FCBGetChar(&subsyms_file);
+			if char != 0 then
+				break;	# found appended data!
+			end if;
+			counter := counter -1;
+		end loop;
+	
+		if char == 0 then
+			len := 1;	# it is an EOF
+			return;
+		end if;
+	end if;	
+
+	# we got a string
+	loop
+		[pbuf] := char;
+		pbuf := pbuf + 1;
+		if char == 0 then 
+			len := (pbuf - &buf[0]) as uint16;	
+			return; 
+		end if;
+		char := FCBGetChar(&subsyms_file);
+	end loop;
+end sub;
+
+# returns StrLen+1
+sub I_str(): (len: uint16) is
+	var pbuf: [uint8];
+	var char: uint8;
+	pbuf := &buf[0];
+	loop
+		char := FCBGetChar(&subsyms_file);
+		[pbuf] := char;
+		pbuf := pbuf + 1;
+		if char == 0 then 
+			len := (pbuf - &buf[0]) as uint16;	
+			return; 
+		end if;
+	end loop;
+end sub;
+
+sub Read_subsyms() is
+	var oldsub: [SubSyms] := 0 as [SubSyms];
+	var crtsub: [SubSyms];
+	var err_io: uint8;
+	var len: uint16;
+	var crtsym: [SymOff];
+	var oldsym: [SymOff];
+	var subname_read: uint8 := 0;
+
+	err_io := FCBOpenIn(&subsyms_file, "$SUBSYMS.$$$");
+
+	if err_io != 0 then return; end if;
+
+	loop
+		# if not already read, read subroutine name
+		if subname_read == 0 then
+			len := I_str0();
+		end if;
+
+		# if no more subs, break		
+		if len == 1 then break; end if;
+
+		# allocate a SubSyms record & save subroutine name
+		crtsub := Alloc(@bytesof SubSyms) as [SubSyms];
+		crtsub.name := Alloc(len);
+		MemCopy(&buf[0], len, crtsub.name);
+
+		# read subroutine's symbols
+		oldsym := 0 as [SymOff];
+
+		loop
+			# read next symbol name, allocate a SymOff record
+			# and save symbol name
+			crtsym := Alloc(@bytesof SymOff) as [SymOff];
+			len := I_str();			
+			crtsym.name := Alloc(len);
+			MemCopy(&buf[0], len, crtsym.name);
+
+			# read offset
+			crtsym.off := I_b16();
+
+			#link sym in list
+			crtsym.next := oldsym;
+			oldsym := crtsym;
+
+			# get next sub name
+			len := I_str0();
+			
+			# if not the same sub, break
+			if StrCmp(&buf[0], crtsub.name) != 0 then
+				subname_read := 1;
+				break;
+			end if;
+			
+			# if same sub, continue
+		end loop;
+
+		# save syms list link
+		crtsub.syms := oldsym;
+
+		# link sub in list
+		crtsub.next := oldsub;
+		oldsub := crtsub;
+	end loop;
+
+	# save subsyms root
+	subsyms := oldsub;
+
+	err_io := FCBClose(&subsyms_file);
+end sub; 
+
+sub FindSubroutine(name: [uint8]): (ret: [SubSyms]) is
+	var crtsub: [SubSyms] := subsyms;
+	while crtsub != 0 as [SubSyms] loop
+		if StrCmp(crtsub.name, name) == 0 then
+			ret := crtsub;
+			return;
+		end if;
+		crtsub := crtsub.next;
+	end loop;
+	ret := 0 as [SubSyms];
+end sub;
+
+sub FreeSubSyms() is
+	var crtsub: [SubSyms] := subsyms;
+	var oldsub: [SubSyms];
+	var crtsym: [SymOff];
+	var oldsym: [SymOff];
+
+	while crtsub != 0 as [SubSyms] loop
+		crtsym := crtsub.syms;
+		while crtsym != 0 as [SymOff] loop
+			Free(crtsym.name);
+			oldsym := crtsym;
+			crtsym := crtsym.next;
+			Free(oldsym as [uint8]);
+		end loop;
+		Free(crtsub.name);
+		oldsub := crtsub;
+		crtsub := crtsub.next;
+		Free(oldsub as [uint8]);
+	end loop;
+end sub;
+
+sub PrintSubSyms() is
+	var subr: [Subroutine];
+	var crtsub: [SubSyms];
+	var crtsym: [SymOff];
+
+	if subsyms == 0 as [SubSyms] then
+		return; 	# something went wrong in Read_subsyms
+	end if;
+
+	print("\nSymbols map\n\n");
+
+	subr := subroutines;
+
+	loop
+		crtsub := FindSubroutine(subr.name);	# should be NOT NULL
+
+		if crtsub != 0 as [SubSyms] then
+			print("\nSubroutine ");
+			print(crtsub.name);
+			print(" symbols list:\n\n");
+			crtsym := crtsub.syms;	# should be NOT NULL
+
+			loop
+				print(crtsym.name);
+				print("\t @ ws+");
+				print_hex_i16(crtsym.off + subr.workspaceAddress[0] as uint16);
+				print_char('H');
+				print("\t(");
+				print_i16(crtsym.off + subr.workspaceAddress[0] as uint16);
+				print(")\n");
+
+				crtsym := crtsym.next;
+
+				if crtsym == 0 as [SymOff] then
+					break;
+				end if;
+			end loop;
+		end if;
+
+		subr := subr.next;
+		if subr == 0 as [Subroutine] then
+			break;
+		end if;
+	end loop;
+end sub;
+
+if symbols == 1 then
+	Read_subsyms();
+	PrintSubSyms();
+	FreeSubSyms();
+end if;
+
+# --------- symbols map ----------------------------------------
+
+EmitterOpenfile(outputFilename);
+
+print("Creating output file: ");
+print(outputFilename);
+print_nl();
+InitStreams();
+SetStream(7);
+ArchEmitHeader(firstCoo);
+FlushStream();
+WriteAllSubroutinesToOutputFile(firstCoo);
+SetStream(7);
+ArchEmitFooter(firstCoo);
+FlushStream();
+
+EmitterClosefile();
+
+print("done: ");
+print_i16((GetFreeMemory() >> 10) as uint16);
+print("kB free\n");
+
