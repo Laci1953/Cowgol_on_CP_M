@@ -1,4 +1,4 @@
-GAMMON IV was written by David C. Oshel in 1986
+The original game was written by David C. Oshel in 1986
 A VT100 version was later published by Anna Christina Nass.
 I ported-it to HiTech C in 2023, adding also game save/load options.
 
