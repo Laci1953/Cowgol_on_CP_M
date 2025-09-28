@@ -1,0 +1,1 @@
+cowgol -o -lcowgol misc.coo backgmmn.cow backmain.cow xrnd.as backfile.as
