@@ -510,7 +510,7 @@ Sample of COWFIX statistics ( when compiling the Adventure game):
  	13707 input source lines processed
  	DONE!
 
-(updated on 14 October, 2025 - aligned to the current version of the Cowgol language)
+(updated on 14 October, 2025 - aligned to the current version of the Cowgol language syntax)
 
 Updated files:
 /EXE : cowfe.hex, cowbe.hex
