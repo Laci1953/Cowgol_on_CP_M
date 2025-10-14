@@ -513,4 +513,7 @@ Sample of COWFIX statistics ( when compiling the Adventure game):
 (updated on 14 October, 2025 - aligned to the current version of the Cowgol language)
 
 Updated files:
-EXE
+/EXE : cowfe.hex, cowbe.hex
+/128_512_KB : cowfe128.hex, cowfe512.hex, cowfeall.hex, cowfewbw.hex
+
+
