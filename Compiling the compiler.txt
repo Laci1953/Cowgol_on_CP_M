@@ -1,5 +1,7 @@
 David Given wrote, on his Cowgol site:
-"Cowgol is an experimental, Ada-inspired language for very small systems (6502, Z80, etc). It's different because it's intended to be self-hosted on these devices: the end goal is to be able to rebuild the entire compiler on an 8-bit micro, although we're not there yet.".
+"Cowgol is an experimental, Ada-inspired language for very small systems (6502, Z80, etc). It's different because it's
+intended to be self-hosted on these devices: the end goal is to be able to rebuild the entire compiler on an 8-bit micro,
+although we're not there yet.".
 
 Now, this end goal is almost done, on Z80 based CP/M computers.
 It is possible to compile all the parts of the Cowgol compiler on CP/M, using the source files published by David Given on
