@@ -1,6 +1,9 @@
-It is possible to compile all the parts of the Cowgol compiler on CP/M, using the source files published by David Given on his site.
+David Given wrote, on his Cowgol site:
+"Cowgol is an experimental, Ada-inspired language for very small systems (6502, Z80, etc). It's different because it's intended to be self-hosted on these devices: the end goal is to be able to rebuild the entire compiler on an 8-bit micro, although we're not there yet.".
 
-The only source file which cannot be generated on CP/M is the file parser.coh from Cowfe; 
+Now, this end goal is almost done, on Z80 based CP/M computers.
+It is possible to compile all the parts of the Cowgol compiler on CP/M, using the source files published by David Given on
+his site. The only source file which cannot be generated on CP/M is the file parser.coh from Cowfe; 
 it can be built only by using the tool 'lemon', on a Unix machine.
 
 Therefore, with this exception, the compilation of the Cowgol compiler can be now performed on a CP/M machine.
