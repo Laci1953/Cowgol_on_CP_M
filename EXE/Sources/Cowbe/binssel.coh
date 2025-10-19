@@ -1,0 +1,2970 @@
+
+	record Extern is
+		name: string;
+		id: uint16;
+		next: [Extern];
+	end record;
+
+	var externs: [Extern] := (0 as [Extern]);
+
+	sub ArchAlignUp(value: Size, alignment: uint8): (newvalue: Size) is
+		newvalue := value;
+	end sub;
+
+	sub E_symref(sym: [Symbol], off: Size) is
+		if sym.wsid == WSID_STATIC then
+			E_wsref(sym.subr.id, sym.wsid, sym.off);
+			if off != 0 then
+				E_i16(off as int16);
+			end if;
+		else
+			E_wsref(sym.subr.id, sym.wsid, sym.off + off);
+		end if;
+	end sub;
+
+	sub R_flushall() is
+		RegCacheFlush(ALL_REGS);
+	end sub;
+
+	sub R_flush(reg: RegId) is
+		RegCacheFlush(FindConflictingRegisters(reg));
+	end sub;
+
+	sub E_label(label: LabelRef) is
+		R_flushall();
+		E_labelref(label);
+		E(":\n");
+	end sub;
+
+	sub E_jump(insn: string, label: LabelRef) is
+		R_flushall();
+		E_tab();
+		E(insn);
+		E_space();
+		E_labelref(label);
+		E_nl();
+	end sub;
+
+	sub E_jp(label: LabelRef) is
+		E_jump("jr", label);
+	end sub;
+
+	sub E_jnz(label: LabelRef) is
+		E_jump("jr nz,", label);
+	end sub;
+
+	sub E_ret() is
+		E("\tret\n");
+	end sub;
+
+	sub E_call(subr: [Subroutine]) is
+		R_flushall();
+		E_tab();
+		E("call ");
+		E_subref(subr);
+		E_nl();
+	end sub;
+
+	sub getreg(reg: RegId, regtable: [RegId], name: string): (result: RegId) is
+		result := 0;
+		while reg != 0 loop
+			if (reg & 1) != 0 then
+				result := [regtable];
+				return;
+			end if;
+			reg := reg >> 1;
+			regtable := @next regtable;
+		end loop;
+
+		if result == 0 then
+			StartError();
+			print("bad ");
+			print(name);
+			print_char(' ');
+			print_hex_i16(reg);
+			EndError();
+		end if;
+	end sub;
+
+	sub loreg(reg: RegId): (result: RegId) is
+		var regs: RegId[] := {
+			REG_A,  # a
+			REG_C,  # b
+			REG_C,  # c
+			REG_E,  # d
+			REG_E,  # e
+			REG_L,  # h
+			REG_L,  # l
+			REG_L,  # hl
+			REG_E,  # de
+			REG_C,  # bc
+			REG_L,  # hlhl
+			REG_E,  # dede
+			REG_C,  # bcbc
+			0,      # ix
+			0,      # iy
+		};
+
+		result := getreg(reg, &regs[0], "loreg");
+	end sub;
+
+	sub hireg(reg: RegId): (result: RegId) is
+		var regs: RegId[] := {
+			REG_A,  # a
+			REG_B,  # b
+			REG_B,  # c
+			REG_D,  # d
+			REG_D,  # e
+			REG_H,  # h
+			REG_H,  # l
+			REG_H,  # hl
+			REG_D,  # de
+			REG_B,  # bc
+			REG_H,  # hlhl
+			REG_D,  # dede
+			REG_B,  # bcbc
+			0,      # ix
+			0,      # iy
+		};
+
+		result := getreg(reg, &regs[0], "hireg");
+	end sub;
+
+	sub wordreg(reg: RegId): (result: RegId) is
+		var regs: RegId[] := {
+			REG_A,  # a
+			REG_BC, # b
+			REG_BC, # c
+			REG_DE, # d
+			REG_DE, # e
+			REG_HL, # h
+			REG_HL, # l
+			REG_HL, # hl
+			REG_DE, # de
+			REG_BC, # bc
+			REG_HL, # hlhl
+			REG_DE, # dede
+			REG_BC, # bcbc
+			REG_IX, # ix
+			REG_IY, # iy
+		};
+
+		result := getreg(reg, &regs[0], "wordreg");
+	end sub;
+
+	sub E_reg(reg: RegId) is
+		var names: string[] := {
+			"a",
+			"b",
+			"c",
+			"d",
+			"e",
+			"h",
+			"l",
+			"hl",
+			"de",
+			"bc",
+			"hl",
+			"de",
+			"bc",
+			"ix",
+			"iy"
+		};
+
+		var p := &names[0];
+		while reg != 0 loop
+			if (reg & 1) != 0 then
+				E([p]);
+				return;
+			end if;
+			reg := reg >> 1;
+			p := @next p;
+		end loop;
+
+		StartError();
+		print("bad reg ");
+		print_hex_i16(reg);
+		EndError();
+	end sub;
+
+	sub E_stackref(reg: RegId) is
+		if reg == REG_A then
+			E("af");
+		else
+			E_reg(reg);
+		end if;
+	end sub;
+
+	sub E_mov(dest: RegId, src: RegId) is
+		R_flush(dest);
+		E_tab();
+		E("ld ");
+		E_reg(dest);
+		E_comma();
+		E_reg(src);
+		E_nl();
+	end sub;
+
+	sub E_ex() is
+		R_flush(REG_HL|REG_DE);
+		E("\tex de,hl\n");
+	end sub;
+
+	sub E_exx() is
+		R_flush(REG_HL|REG_DE|REG_BC);
+		E("\texx\n");
+	end sub;
+
+	sub E_push(src: RegId) is
+		E("\tpush ");
+		E_stackref(src);
+		E_nl();
+	end sub;
+
+	sub E_pop(dest: RegId) is
+		R_flush(dest);
+		E("\tpop ");
+		E_stackref(dest);
+		E_nl();
+	end sub;
+
+	sub E_loadm(reg: RegId) is
+		R_flush(reg);
+		E("\tld ");
+		E_reg(reg);
+		E(",(hl)\n");
+	end sub;
+
+	sub E_storem(reg: RegId) is
+		E("\tld (hl),");
+		E_reg(reg);
+		E_nl();
+	end sub;
+
+	sub E_stax(ptr: RegId) is
+		E("\tld (");
+		E_reg(ptr);
+		E("), a\n");
+	end sub;
+
+	sub E_ldax(ptr: RegId) is
+		R_flush(REG_A);
+		E("\tld a, (");
+		E_reg(ptr);
+		E(")\n");
+	end sub;
+
+	sub E_lda(sym: [Symbol], off: Size) is
+		var cache := RegCacheFindValue(sym, off);
+		if (cache & REG_A) != 0 then
+			# Value already in the right register.
+			return;
+		end if; # Other cases don't happen on the 8080.
+
+		R_flush(REG_A);
+		E("\tld a, (");
+		E_symref(sym, off);
+		E(")\n");
+		RegCacheLeavesValue(REG_A, sym, off);
+	end sub;
+
+	sub E_sta(sym: [Symbol], off: Size) is
+		E("\tld (");
+		E_symref(sym, off);
+		E("), a\n");
+		RegCacheLeavesValue(REG_A, sym, off);
+	end sub;
+
+	sub E_load8i(dest: RegId, index: RegId, off: int8) is
+		R_flush(dest);
+		E("\tld ");
+		E_reg(dest);
+		E(", (");
+		E_reg(index);
+		E_i8(off);
+		E(")\n");
+	end sub;
+
+	sub E_store8i(src: RegId, index: RegId, off: int8) is
+		E("\tld (");
+		E_reg(index);
+		E_i8(off);
+		E("), ");
+		E_reg(src);
+		E_nl();
+	end sub;
+
+	sub E_store8ic(val: uint8, index: RegId, off: int8) is
+		E("\tld (");
+		E_reg(index);
+		E_i8(off);
+		E("), ");
+		E_u8(val);
+		E_nl();
+	end sub;
+
+	sub E_loada(ptr: RegId) is
+		if ptr == REG_HL then
+			E_loadm(REG_A);
+		elseif (ptr & (REG_IX|REG_IY)) != 0 then
+			E_load8i(REG_A, ptr, 0);
+		else
+			E_ldax(ptr);
+		end if;
+	end sub;
+
+	sub E_load16(dest: RegId, sym: [Symbol], off: Size) is
+		var cache := RegCacheFindValue(sym, off);
+		if (cache & dest) != 0 then
+			# Value already in the right register.
+			return;
+		elseif cache != 0 then
+			# Value in a register, but not the right one.
+			cache := FindFirst(cache);
+			if ((cache|dest) & (REG_IX|REG_IY)) != 0 then
+				E_push(cache);
+				E_pop(dest);
+			else
+				E_mov(hireg(dest), hireg(cache));
+				E_mov(loreg(dest), loreg(cache));
+			end if;
+			return;
+		end if;
+
+		R_flush(dest);
+		E("\tld ");
+		E_reg(dest);
+		E(", (");
+		E_symref(sym, off);
+		E(")\n");
+		RegCacheLeavesValue(dest, sym, off);
+	end sub;
+
+	sub E_store16(src: RegId, sym: [Symbol], off: Size) is
+		RegCacheFlushValue(sym, off);
+		E("\tld (");
+		E_symref(sym, off);
+		E("), ");
+		E_reg(src);
+		E_nl();
+		RegCacheLeavesValue(src, sym, off);
+	end sub;
+
+	sub E_mvi(reg: RegId, value: uint8) is
+		if (reg & (REG_HL|REG_BC|REG_DE)) != 0 then
+			SimpleError("mvi with 16-bit reg");
+		end if;
+
+		var cache := RegCacheFindConstant(value as Word)
+			& (REG_A|REG_B|REG_C|REG_D|REG_H|REG_L);
+		if (cache & reg) != 0 then
+			# Already in the desired register.
+			return;
+		elseif cache != 0 then
+			# Already in a register, but not the one we want.
+			E_mov(reg, FindFirst(cache));
+			return;
+		end if;
+
+		R_flush(reg);
+		E("\tld ");
+		E_reg(reg);
+		E_comma();
+		E_u8(value);
+		E_nl();
+		RegCacheLeavesConstant(reg, value as Word);
+	end sub;
+
+	sub E_alu(insn: string, rhs: RegId) is
+		R_flush(REG_A);
+		E_tab();
+		E(insn);
+		E_space();
+		E_reg(rhs);
+		E_nl();
+	end sub;
+
+	sub E_cp(rhs: RegId) is
+		E("\tcp ");
+		E_reg(rhs);
+		E_nl();
+	end sub;
+
+	sub E_rra() is
+		R_flush(REG_A);
+		E("\trra\n");
+	end sub;
+
+	sub E_cpl() is
+		R_flush(REG_A);
+		E("\tcpl\n");
+	end sub;
+
+	sub E_rcf() is # reset carry flag
+		# Don't use E_alu here because we don't want to flush A.
+		E("\tand a\n");
+	end sub;
+
+	sub E_sub(rhs: RegId) is
+		E_alu("sub", rhs);
+	end sub;
+
+	sub E_and(rhs: RegId) is
+		E_alu("and", rhs);
+	end sub;
+
+	sub E_or(rhs: RegId) is
+		E_alu("or", rhs);
+	end sub;
+
+	sub E_xor(rhs: RegId) is
+		E_alu("xor", rhs);
+		if rhs == REG_A then
+			RegCacheLeavesConstant(REG_A, 0);
+		end if;
+	end sub;
+
+	sub E_alui(insn: string, value: uint8) is
+		R_flush(REG_A);
+		E_tab();
+		E(insn);
+		E_space();
+		E_u8(value);
+		E_nl();
+	end sub;
+
+	sub E_addi(value: uint8) is
+		E_alui("add", value);
+	end sub;
+
+	sub E_adci(value: uint8) is
+		E_alui("adc", value);
+	end sub;
+
+	sub E_subi(value: uint8) is
+		E_alui("sub", value);
+	end sub;
+
+	sub E_sbci(value: uint8) is
+		E_alui("sbc", value);
+	end sub;
+
+	sub E_ori(value: uint8) is
+		E_alui("or", value);
+	end sub;
+
+	sub E_xori(value: uint8) is
+		E_alui("xor", value);
+	end sub;
+
+	sub E_andi(value: uint8) is
+		E_alui("and", value);
+	end sub;
+
+	sub E_cpi(value: uint8) is
+		E("\tcp ");
+		E_u8(value);
+		E_nl();
+	end sub;
+
+	sub E_inc(reg: RegId) is
+		R_flush(reg);
+		E("\tinc ");
+		E_reg(reg);
+		E_nl();
+	end sub;
+
+	sub E_dec(reg: RegId) is
+		R_flush(reg);
+		E("\tdec ");
+		E_reg(reg);
+		E_nl();
+	end sub;
+
+	sub E_alu2(insn: string, lhs: RegId, rhs: RegId) is
+		R_flush(lhs);
+		E_tab();
+		E(insn);
+		E_space();
+		E_reg(lhs);
+		E_comma();
+		E_reg(rhs);
+		E_nl();
+	end sub;
+
+	sub E_add(lhs: RegId, rhs: RegId) is
+		E_alu2("add", lhs, rhs);
+	end sub;
+
+	sub E_adc(lhs: RegId, rhs: RegId) is
+		E_alu2("adc", lhs, rhs);
+	end sub;
+
+	sub E_sbc(lhs: RegId, rhs: RegId) is
+		E_alu2("sbc", lhs, rhs);
+	end sub;
+
+	sub E_shift(insn: string, reg: RegId) is
+		R_flush(reg);
+		E_tab();
+		E(insn);
+		E_space();
+		E_reg(reg);
+		E_nl();
+	end sub;
+
+	sub E_sra(reg: RegId) is
+		E_shift("sra", reg);
+	end sub;
+
+	sub E_srl(reg: RegId) is
+		E_shift("srl", reg);
+	end sub;
+
+	sub E_rr(reg: RegId) is
+		E_shift("rr", reg);
+	end sub;
+
+	sub E_bit(bit: uint8, reg: RegId) is
+		E("\tbit ");
+		E_u8(bit);
+		E_comma();
+		E_reg(reg);
+		E_nl();
+	end sub;
+
+	# Does not persist the name; only call this with constant strings.
+	sub E_callhelper(name: string) is
+		var e := externs;
+		while e != (0 as [Extern]) loop
+			if StrCmp(e.name, name) == 0 then
+				break;
+			end if;
+			e := e.next;
+		end loop;
+
+		if e == (0 as [Extern]) then
+			e := InternalAlloc(@bytesof Extern) as [Extern];
+			e.name := name;
+			e.id := AllocSubrId();
+			e.next := externs;
+			externs := e;
+
+			EmitterDeclareExternalSubroutine(e.id, name);
+		end if;
+
+		EmitterReferenceSubroutineById(current_subr.id, e.id);
+
+		R_flushall();
+		E("\tcall ");
+		E_b8(COO_ESCAPE_SUBREF);
+		E_b16(e.id);
+		E_nl();
+	end sub;
+
+	var stringid: uint16 := 0;
+	sub E_string(data: string) is
+		var sid := stringid;
+		stringid := stringid + 1;
+
+		EmitterOpenStream(current_subr);
+
+		E_b8(COO_ESCAPE_THISCOO);
+		E_b8('c');
+		E_u16(sid);
+		E(":\n\tdb ");
+
+		loop
+			var c := [data];
+			if c == 0 then
+				break;
+			end if;
+			data := data + 1;
+			
+			E_u8(c);
+			E_comma();
+		end loop;
+		E("0\n");
+		EmitterCloseStream();
+
+		E_b8(COO_ESCAPE_THISCOO);
+		E_b8('c');
+		E_u16(sid);
+	end sub;
+
+    sub ArchBeginComment() is
+        E("\t; ");
+    end sub;
+
+    sub ArchEndComment() is
+        E_nl();
+    end sub;
+
+	sub ArchEmitMove(src: RegId, dest: RegId) is
+		if src == 0 then
+			E_pop(dest);
+			if (dest & (REG_HLHL|REG_DEDE|REG_BCBC)) != 0 then
+				E_exx();
+				E_pop(dest);
+				E_exx();
+			end if;
+		elseif dest == 0 then
+			if (src & (REG_HLHL|REG_DEDE|REG_BCBC)) != 0 then
+				E_exx();
+				E_push(src);
+				E_exx();
+			end if;
+			E_push(src);
+		elseif ((src == REG_HL) and (dest == REG_DE))
+				or ((src == REG_DE) and (dest == REG_HL)) then
+			E_ex();
+		elseif ((src == REG_HLHL) and (dest == REG_DEDE))
+				or ((src == REG_DEDE) and (dest == REG_HLHL)) then
+			E_ex();
+			E_exx();
+			E_ex();
+			E_exx();
+		elseif ((src|dest) & (REG_HLHL|REG_DEDE|REG_BCBC)) != 0 then
+			E_mov(loreg(dest), loreg(src));
+			E_mov(hireg(dest), hireg(src));
+			E_exx();
+			E_mov(loreg(dest), loreg(src));
+			E_mov(hireg(dest), hireg(src));
+			E_exx();
+		elseif ((src|dest) & (REG_IX|REG_IY)) != 0 then
+			E_push(src);
+			E_pop(dest);
+		elseif (src & (REG_HL|REG_BC|REG_DE)) != 0 then
+			E_mov(hireg(dest), hireg(src));
+			E_mov(loreg(dest), loreg(src));
+		else
+			E_mov(dest, src);
+		end if;
+	end sub;
+
+	sub E_lxi(reg: RegId, value: uint16) is
+		var cache := RegCacheFindConstant(value as Word) & (REG_HL|REG_BC|REG_DE|REG_IX|REG_IY);
+		if (cache & reg) != 0 then
+			# The value is already in the desired register.
+			return;
+		elseif cache != 0 then
+			# The value is already in a register, but not this one.
+			cache := FindFirst(cache);
+			ArchEmitMove(cache, reg);
+			return;
+		end if;
+
+		R_flush(reg);
+		E("\tld ");
+		E_reg(reg);
+		E_comma();
+		E_u16(value);
+		E_nl();
+		RegCacheLeavesConstant(reg, value as Word);
+		if (reg & (REG_IX|REG_IY)) != 0 then
+			RegCacheLeavesConstant(loreg(reg), value as uint8 as Word);
+			RegCacheLeavesConstant(hireg(reg), (value>>8) as uint8 as Word);
+		end if;
+	end sub;
+
+	sub E_lxia(reg: RegId, sym: [Symbol], off: Size) is
+		# This optimisation doesn't appear to be used in real life and
+		# costs about 400 bytes in the compiler, so let's leave it disabled.
+
+		#var cache := RegCacheFindAddress(sym, off) & (REG_HL|REG_BC|REG_DE|REG_IX|REG_IY);
+		#if (cache & reg) != 0 then
+		#	# The value is already in the desired register.
+		#	return;
+		#elseif cache != 0 then
+		#	# The value is already in a register, but not this one.
+		#	cache := FindFirst(cache);
+		#	ArchEmitMove(cache, reg);
+		#	return;
+		#end if;
+
+		R_flush(reg);
+		E("\tld ");
+		E_reg(reg);
+		E_comma();
+		E_symref(sym, off);
+		E_nl();
+		#RegCacheLeavesAddress(reg, sym, off);
+	end sub;
+
+	sub ArchEndInstruction() is
+	end sub;
+
+	sub ArchEndGroup() is
+	end sub;
+
+	sub Call(addr: [MidcodeSubref]) is
+		E_call(addr.subr);
+	end sub;
+
+	sub CallI() is
+		E_callhelper("_jpde");
+	end sub;
+
+	sub is_indexable_8bit(value: Arith): (result: uint8) is
+		result := 1;
+		if (value < -128) or (value > 127) or ((value >= -4) and (value <= 4)) then
+			result := 0;
+		end if;
+	end sub;
+
+	sub is_indexable_16bit(value: Arith): (result: uint8) is
+		result := 1;
+		if (value < -128) or (value > 126) or ((value >= -3) and (value <= 3)) then
+			result := 0;
+		end if;
+	end sub;
+
+	sub is_indexable_32bit(value: Arith): (result: uint8) is
+		result := 1;
+		if (value < -128) or (value > 124) or ((value >= -3) and (value <= 3)) then
+			result := 0;
+		end if;
+	end sub;
+
+	sub is_small_positive(value: int32): (result: uint8) is
+		if (value > 0) and (value < 5) then
+			result := 1;
+		else
+			result := 0;
+		end if;
+	end sub;
+
+	sub is_small_negative(value: int32): (result: uint8) is
+		if (value < 0) and (value > -5) then
+			result := 1;
+		else
+			result := 0;
+		end if;
+	end sub;
+
+	sub aluop2(lhs: RegId, rhs: RegId, dest: RegId, loinsn: string, hiinsn: string) is
+		E_mov(REG_A, loreg(lhs));
+		E_alu(loinsn, loreg(rhs));
+		E_mov(loreg(dest), REG_A);
+		E_mov(REG_A, hireg(lhs));
+		E_alu(hiinsn, hireg(rhs));
+		E_mov(hireg(dest), REG_A);
+	end sub;
+
+	sub aluop2i(lhs: RegId, value: uint16, dest: RegId, loinsn: string, hiinsn: string) is
+		E_mov(REG_A, loreg(lhs));
+		E_alui(loinsn, value as uint8);
+		E_mov(loreg(dest), REG_A);
+		E_mov(REG_A, hireg(lhs));
+		E_alui(hiinsn, (value >> 8) as uint8);
+		E_mov(hireg(dest), REG_A);
+	end sub;
+
+	sub E_dvrmu2() is
+		E_callhelper("_dvrmu2");
+	end sub;
+
+	sub E_dvrms2() is
+		E_callhelper("_dvrms2");
+	end sub;
+
+
+	sub logic2(lhs: RegId, rhs: RegId, dest: RegId, insn: string) is
+		aluop2(lhs, rhs, dest, insn, insn);
+	end sub;
+
+	sub logic2i(lhs: RegId, value: uint16, dest: RegId, insn: string) is
+		aluop2i(lhs, value, dest, insn, insn);
+	end sub;
+
+	sub E_jumps_with_fallthrough(trueinsn: string, falseinsn: string, node: [Node]) is
+		if node.beq.truelabel != node.beq.fallthrough then
+			E_jump(trueinsn, node.beq.truelabel);
+		end if;
+		if node.beq.falselabel != node.beq.fallthrough then
+			E_jump(falseinsn, node.beq.falselabel);
+		end if;
+	end sub;
+
+	sub E_jumps_jz_jnz(node: [Node]) is
+		E_jumps_with_fallthrough("jr z,", "jr nz,", node);
+	end sub;
+
+	sub E_jumps_jnz_jz(node: [Node]) is
+		E_jumps_with_fallthrough("jr nz,", "jr z,", node);
+	end sub;
+
+	sub E_jumps_jc_jnc(node: [Node]) is
+		E_jumps_with_fallthrough("jr c,", "jr nc,", node);
+	end sub;
+
+	sub E_jumps_jm_jp(node: [Node]) is
+		E_jumps_with_fallthrough("jp m,", "jp p,", node);
+	end sub;
+
+	sub bequ1(node: [Node], nota: RegId) is
+		E_cp(nota);
+		E_jumps_jz_jnz(node);
+	end sub;
+
+	sub bequ1c(node: [Node], value: uint8) is
+		if value == 0 then
+			E_or(REG_A);
+		else
+			E_cpi(value);
+		end if;
+		E_jumps_jz_jnz(node);
+	end sub;
+
+	sub cmpeq2(value: uint16) is
+		if value != 0 then
+			E_lxi(REG_DE, -value);
+			E_add(REG_HL, REG_DE);
+		end if;
+		E_mov(REG_A, REG_H);
+		E_or(REG_L);
+	end sub;
+
+	sub bequ2c(node: [Node], value: uint16) is
+		cmpeq2(value);
+		E_jumps_jz_jnz(node);
+	end sub;
+
+	sub bequ2(node: [Node], lhs: RegId) is
+		E_rcf();
+		E_sbc(REG_HL, lhs);
+		E_jumps_jz_jnz(node);
+	end sub;
+
+	sub bequ4(node: [Node]) is
+		E_callhelper("_cmpu4");
+		E_jumps_jz_jnz(node);
+	end sub;
+
+	sub bequ4c(node: [Node], value: Arith) is
+		if value == 0 then
+			E_mov(REG_A, REG_H);
+			E_or(REG_L);
+			E_exx();
+			E_or(REG_H);
+			E_or(REG_L);
+		else
+			E_rcf();
+			cmpeq2(value as uint16);
+			E_jump("jr nz,", node.beq.falselabel);
+			E_exx();
+			cmpeq2((value>>16) as uint16);
+		end if;
+		E_exx();
+		E_jumps_jz_jnz(node);
+	end sub;
+
+	sub beqc(node: [Node], lhs: Arith, rhs: Arith) is
+		var label := node.beq.falselabel;
+		if lhs == rhs then
+			label := node.beq.truelabel;
+		end if;
+		if label != node.beq.fallthrough then
+			E_jp(label);
+		end if;
+	end sub;
+
+	sub case2(value: uint16, reg: RegId, label: LabelRef) is
+		if value < 0x100 then
+			E_mov(REG_A, loreg(reg));
+			if value != 0 then
+				E_subi(value as uint8);
+			end if;
+			E_or(hireg(reg));
+		else
+			E_lxi(REG_HL, -value);
+			E_add(REG_HL, reg);
+			E_mov(REG_A, REG_H);
+			E_or(REG_L);
+		end if;
+		E_jnz(label);
+	end sub;
+sub MatchPredicate(rule: uint8, n: [[Node]]): (matches: uint8) is
+var slots: [Node][8];
+MemCopy(n as [uint8], @bytesof slots, &slots[0] as [uint8]);
+matches := 0;
+case rule is
+when 0:
+if  (is_indexable_8bit(slots[7].constant.value) != 0) then matches := 1; end if;
+when 1:
+if  (is_indexable_16bit(slots[7].constant.value) != 0) then matches := 1; end if;
+when 2:
+if  (is_indexable_8bit(slots[7].constant.value) != 0) then matches := 1; end if;
+when 3:
+if  (is_indexable_16bit(slots[7].constant.value) != 0) then matches := 1; end if;
+when 4:
+if  (is_indexable_32bit(slots[7].constant.value) != 0) then matches := 1; end if;
+when 5:
+if  (is_indexable_8bit(slots[3].constant.value) != 0) then matches := 1; end if;
+when 7:
+if  (is_indexable_16bit(slots[3].constant.value) != 0) then matches := 1; end if;
+when 8:
+if  (is_indexable_32bit(slots[3].constant.value) != 0) then matches := 1; end if;
+when 9:
+if  (slots[4].constant.value <= 5) then matches := 1; end if;
+when 10:
+if  (slots[4].constant.value == 1) then matches := 1; end if;
+when 11:
+if  (slots[4].constant.value == 1) then matches := 1; end if;
+when 12:
+if  (slots[4].constant.value == -1) then matches := 1; end if;
+when 13:
+if  (slots[4].constant.value == 1) then matches := 1; end if;
+when 14:
+if  (slots[4].constant.value == 1) then matches := 1; end if;
+when 17:
+if  (slots[4].constant.value == 0) then matches := 1; end if;
+when 19:
+if  (slots[4].constant.value == 0) then matches := 1; end if;
+when 21:
+if  (slots[4].constant.value == 0) then matches := 1; end if;
+when 23:
+if  (slots[4].constant.value <= 5) then matches := 1; end if;
+when 24:
+if  (slots[4].constant.value <= 3) then matches := 1; end if;
+when 25:
+if  (slots[4].constant.value <= 3) then matches := 1; end if;
+when 26:
+if  (is_small_positive(slots[4].constant.value) != 0) then matches := 1; end if;
+when 27:
+if  (is_small_negative(slots[4].constant.value) != 0) then matches := 1; end if;
+when 32:
+if  (slots[0].poparg.remaining != 0) then matches := 1; end if;
+when 35:
+if  (slots[0].poparg.remaining == 0) then matches := 1; end if;
+when 37:
+if  (slots[0].poparg.remaining == 0) then matches := 1; end if;
+when 45:
+if  (slots[0].cast1.sext == 0) then matches := 1; end if;
+when 46:
+if  (slots[0].cast1.sext != 0) then matches := 1; end if;
+when 47:
+if  (slots[0].cast1.sext == 0) then matches := 1; end if;
+when 48:
+if  (slots[0].cast1.sext != 0) then matches := 1; end if;
+when 49:
+if  (slots[0].cast2.sext == 0) then matches := 1; end if;
+when 50:
+if  (slots[0].cast2.sext != 0) then matches := 1; end if;
+when 51:
+if  (slots[0].poparg.remaining != 0) then matches := 1; end if;
+when 60:
+if  (slots[0].poparg.remaining == 0) then matches := 1; end if;
+when 67:
+if  (slots[0].poparg.remaining != 0) then matches := 1; end if;
+end case;
+end sub;
+sub EmitOneInstruction(ruleid: uint8, self: [Instruction]) is
+record NodeSlot is
+	node: [Node];
+	reg: RegId;
+end record;
+var slots: NodeSlot[8];
+var psrc := &self.n[0];
+var pdest := &slots[0];
+var i: uint8 := 8;
+while i != 0 loop
+	pdest.node := [psrc];
+	if pdest.node != (0 as [Node]) then
+		pdest.reg := pdest.node.produced_reg;
+	end if;
+	psrc := @next psrc;
+	pdest := @next pdest;
+	i := i - 1;
+end loop;
+var selfreg := self.produced_reg;
+interface Emitter();
+sub emit_0 implements Emitter is
+#line 1023 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_store8ic(slots[1].node.constant.value as uint8, slots[6].reg, slots[7].node.constant.value as int8);
+
+end sub;
+sub emit_1 implements Emitter is
+#line 1090 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_store8ic(slots[1].node.constant.value as uint8, slots[6].reg, (slots[7].node.constant.value as int8)+0);
+	E_store8ic((slots[1].node.constant.value>>8) as uint8, slots[6].reg, (slots[7].node.constant.value as int8)+1);
+
+end sub;
+sub emit_2 implements Emitter is
+#line 1018 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_store8i(slots[1].reg, slots[6].reg, slots[7].node.constant.value as int8);
+
+end sub;
+sub emit_3 implements Emitter is
+#line 1084 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_store8i(loreg(slots[1].reg), slots[6].reg, (slots[7].node.constant.value as int8)+0);
+	E_store8i(hireg(slots[1].reg), slots[6].reg, (slots[7].node.constant.value as int8)+1);
+
+end sub;
+sub emit_4 implements Emitter is
+#line 1192 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_store8i(loreg(slots[1].reg), slots[6].reg, (slots[7].node.constant.value as int8)+0);
+	E_store8i(hireg(slots[1].reg), slots[6].reg, (slots[7].node.constant.value as int8)+1);
+	E_exx();
+	E_store8i(loreg(slots[1].reg), slots[6].reg, (slots[7].node.constant.value as int8)+2);
+	E_store8i(hireg(slots[1].reg), slots[6].reg, (slots[7].node.constant.value as int8)+3);
+	E_exx();
+
+end sub;
+sub emit_5 implements Emitter is
+#line 999 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_load8i(selfreg, slots[2].reg, slots[3].node.constant.value as int8);
+
+end sub;
+sub emit_6 implements Emitter is
+#line 1212 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_lxi(REG_HL, slots[1].node.constant.value as uint16);
+	E_store16(REG_HL, &slots[5].node.address.sym, slots[5].node.address.off);
+	E_lxi(REG_HL, (slots[1].node.constant.value >> 16) as uint16);
+	E_store16(REG_HL, &slots[5].node.address.sym, slots[5].node.address.off+2);
+
+end sub;
+sub emit_7 implements Emitter is
+#line 1061 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_load8i(loreg(selfreg), slots[2].reg, (slots[3].node.constant.value as int8)+0);
+	E_load8i(hireg(selfreg), slots[2].reg, (slots[3].node.constant.value as int8)+1);
+
+end sub;
+sub emit_8 implements Emitter is
+#line 1142 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_load8i(loreg(selfreg), slots[2].reg, (slots[3].node.constant.value as int8)+0);
+	E_load8i(hireg(selfreg), slots[2].reg, (slots[3].node.constant.value as int8)+1);
+	E_exx();
+	E_load8i(loreg(selfreg), slots[2].reg, (slots[3].node.constant.value as int8)+2);
+	E_load8i(hireg(selfreg), slots[2].reg, (slots[3].node.constant.value as int8)+3);
+	E_exx();
+
+end sub;
+sub emit_9 implements Emitter is
+#line 1506 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	var i := slots[4].node.constant.value as uint8;
+	while i != 0 loop
+		E_add(REG_HL, REG_HL);
+		i := i - 1;
+	end loop;
+
+end sub;
+sub emit_10 implements Emitter is
+#line 1515 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_srl(hireg(selfreg));
+	E_rr(loreg(selfreg));
+
+end sub;
+sub emit_11 implements Emitter is
+#line 1521 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_sra(hireg(selfreg));
+	E_rr(loreg(selfreg));
+
+end sub;
+sub emit_12 implements Emitter is
+#line 1228 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_dec(selfreg); 
+end sub;
+sub emit_13 implements Emitter is
+#line 1231 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_inc(selfreg); 
+end sub;
+sub emit_14 implements Emitter is
+#line 1243 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_dec(selfreg); 
+end sub;
+sub emit_15 implements Emitter is
+#line 1691 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ beqc(self.n[0], slots[1].node.constant.value, slots[4].node.constant.value); 
+end sub;
+sub emit_16 implements Emitter is
+#line 892 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ Call(&slots[4].node.subref); 
+end sub;
+sub emit_17 implements Emitter is
+#line 1733 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_or(REG_A);
+	E_jumps_jm_jp(self.n[0]);
+
+end sub;
+sub emit_18 implements Emitter is
+#line 893 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ Call(&slots[4].node.subref); 
+end sub;
+sub emit_19 implements Emitter is
+#line 1758 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_bit(7, hireg(slots[1].reg));
+	E_jumps_jnz_jz(self.n[0]);
+
+end sub;
+sub emit_20 implements Emitter is
+#line 894 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ Call(&slots[4].node.subref); 
+end sub;
+sub emit_21 implements Emitter is
+#line 1782 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_exx();
+	E_bit(7, hireg(slots[1].reg));
+	E_exx();
+	E_jumps_jnz_jz(self.n[0]);
+
+end sub;
+sub emit_22 implements Emitter is
+#line 1004 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_sta(&slots[5].node.address.sym, slots[5].node.address.off);
+
+end sub;
+sub emit_23 implements Emitter is
+#line 1309 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	var i := slots[4].node.constant.value as uint8;
+	while i != 0 loop
+		E_add(REG_A, REG_A);
+		i := i - 1;
+	end loop;
+
+end sub;
+sub emit_24 implements Emitter is
+#line 1318 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	var i := slots[4].node.constant.value as uint8;
+	while i != 0 loop
+		E_srl(selfreg);
+		i := i - 1;
+	end loop;
+
+end sub;
+sub emit_25 implements Emitter is
+#line 1327 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	var i := slots[4].node.constant.value as uint8;
+	while i != 0 loop
+		E_sra(selfreg);
+		i := i - 1;
+	end loop;
+
+end sub;
+sub emit_26 implements Emitter is
+#line 1356 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	var i: uint8 := slots[4].node.constant.value as uint8;
+	while i != 0 loop
+		E_inc(selfreg);
+		i := i - 1;
+	end loop;
+
+end sub;
+sub emit_27 implements Emitter is
+#line 1365 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	var i: uint8 := slots[4].node.constant.value as uint8;
+	while i != 0 loop
+		E_dec(selfreg);
+		i := i + 1;
+	end loop;
+
+end sub;
+sub emit_28 implements Emitter is
+#line 1913 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_lda(&slots[2].node.address.sym, slots[2].node.address.off); 
+end sub;
+sub emit_29 implements Emitter is
+#line 1922 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_lda(&slots[2].node.address.sym, slots[2].node.address.off); 
+end sub;
+sub emit_30 implements Emitter is
+#line 1067 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_store16(slots[1].reg, &slots[5].node.address.sym, slots[5].node.address.off);
+
+end sub;
+sub emit_31 implements Emitter is
+#line 1202 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	RegCacheFlushValue(&slots[5].node.address.sym, slots[5].node.address.off);
+	E_store16(wordreg(slots[1].reg), &slots[5].node.address.sym, slots[5].node.address.off);
+	E_exx();
+	E_store16(wordreg(slots[1].reg), &slots[5].node.address.sym, slots[5].node.address.off+2);
+	E_exx();
+	RegCacheLeavesValue(selfreg, &slots[5].node.address.sym, slots[5].node.address.off);
+
+end sub;
+sub emit_32 implements Emitter is
+#line 912 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_pop(selfreg); 
+end sub;
+sub emit_33 implements Emitter is
+#line 991 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_lda(&slots[1].node.address.sym, slots[1].node.address.off);
+
+end sub;
+sub emit_34 implements Emitter is
+#line 891 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ Call(&slots[4].node.subref); 
+end sub;
+sub emit_36 implements Emitter is
+#line 898 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ CallI(); 
+end sub;
+sub emit_38 implements Emitter is
+#line 1009 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	if slots[5].reg == REG_HL then
+		E_storem(REG_A);
+	else
+		E_stax(slots[5].reg);
+	end if;
+
+end sub;
+sub emit_39 implements Emitter is
+#line 897 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ CallI(); 
+end sub;
+sub emit_40 implements Emitter is
+#line 1472 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ logic2i(slots[1].reg, slots[4].node.constant.value as uint16, selfreg, "or"); 
+end sub;
+sub emit_41 implements Emitter is
+#line 1234 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_addi(slots[4].node.constant.value as uint8); 
+end sub;
+sub emit_42 implements Emitter is
+#line 1478 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ logic2i(slots[1].reg, slots[4].node.constant.value as uint16, selfreg, "and"); 
+end sub;
+sub emit_43 implements Emitter is
+#line 1152 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	var cache := RegCacheFindValue(&slots[1].node.address.sym, slots[1].node.address.off);
+	if (cache & selfreg) != 0 then
+		# Value already in the right register.
+		return;
+	end if;
+
+	E_load16(wordreg(selfreg), &slots[1].node.address.sym, slots[1].node.address.off);
+	E_exx();
+	E_load16(wordreg(selfreg), &slots[1].node.address.sym, slots[1].node.address.off+2);
+	E_exx();
+	RegCacheLeavesValue(selfreg, &slots[1].node.address.sym, slots[1].node.address.off);
+
+end sub;
+sub emit_44 implements Emitter is
+#line 1484 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ logic2i(slots[1].reg, slots[4].node.constant.value as uint16, selfreg, "xor"); 
+end sub;
+sub emit_45 implements Emitter is
+#line 1855 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_mov(loreg(selfreg), REG_A);
+	E_mvi(hireg(selfreg), 0);
+
+end sub;
+sub emit_46 implements Emitter is
+#line 1861 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_mov(loreg(selfreg), REG_A);
+	E_add(REG_A, REG_A);
+	E_sbc(REG_A, REG_A);
+	E_mov(hireg(selfreg), REG_A);
+
+end sub;
+sub emit_47 implements Emitter is
+#line 1869 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_mov(loreg(selfreg), REG_A);
+	E_xor(REG_A);
+	E_mov(hireg(selfreg), REG_A);
+	E_exx();
+	E_mov(loreg(selfreg), REG_A);
+	E_mov(hireg(selfreg), REG_A);
+	E_exx();
+
+end sub;
+sub emit_48 implements Emitter is
+#line 1880 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_mov(loreg(selfreg), REG_A);
+	E_add(REG_A, REG_A);
+	E_sbc(REG_A, REG_A);
+	E_mov(hireg(selfreg), REG_A);
+	E_exx();
+	E_mov(loreg(selfreg), REG_A);
+	E_mov(hireg(selfreg), REG_A);
+	E_exx();
+
+end sub;
+sub emit_49 implements Emitter is
+#line 1892 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_exx();
+	E_lxi(REG_HL, 0);
+	E_exx();
+
+end sub;
+sub emit_50 implements Emitter is
+#line 1899 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_mov(REG_A, REG_H);
+	E_add(REG_A, REG_A);
+	E_sbc(REG_A, REG_A);
+	E_exx();
+	E_mov(REG_L, REG_A);
+	E_mov(REG_H, REG_A);
+	E_exx();
+
+end sub;
+sub emit_51 implements Emitter is
+#line 913 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ ArchEmitMove(0, selfreg); 
+end sub;
+sub emit_52 implements Emitter is
+#line 1167 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	if slots[5].reg == REG_HL then
+		E_storem(loreg(slots[1].reg));           #  7
+		E_inc(REG_HL);                   #  6
+		E_storem(hireg(slots[1].reg));           #  7
+		E_inc(REG_HL);                   #  6
+		E_push(REG_HL);                  # 11
+		E_exx();                         #  4
+		E_pop(REG_HL);                   # 10
+		E_storem(loreg(slots[1].reg));           #  7
+		E_inc(REG_HL);                   #  6
+		E_storem(hireg(slots[1].reg));           #  7
+		E_exx();                         # 71 t-states
+	else
+		E_store8i(loreg(slots[1].reg), slots[5].reg, 0); # 19
+		E_store8i(hireg(slots[1].reg), slots[5].reg, 1); # 19
+		E_exx();                         #  4
+		E_store8i(loreg(slots[1].reg), slots[5].reg, 2); # 19
+		E_store8i(hireg(slots[1].reg), slots[5].reg, 3); # 19
+		E_exx();                         #  4
+		                                 # 84 t-states
+	end if;
+
+end sub;
+sub emit_53 implements Emitter is
+#line 1916 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_loada(slots[2].reg); 
+end sub;
+sub emit_54 implements Emitter is
+#line 1039 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_load16(selfreg, &slots[1].node.address.sym, slots[1].node.address.off);
+
+end sub;
+sub emit_55 implements Emitter is
+#line 1225 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ R_flush(REG_A); E("\tadd a,(hl)\n"); 
+end sub;
+sub emit_56 implements Emitter is
+#line 1925 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_loada(slots[2].reg); 
+end sub;
+sub emit_57 implements Emitter is
+#line 899 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ CallI(); 
+end sub;
+sub emit_58 implements Emitter is
+#line 1264 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ R_flush(REG_A); E("\tor a,(hl)\n"); 
+end sub;
+sub emit_59 implements Emitter is
+#line 1267 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_ori(slots[4].node.constant.value as uint8); 
+end sub;
+sub emit_61 implements Emitter is
+#line 1246 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_subi(slots[4].node.constant.value as uint8); 
+end sub;
+sub emit_62 implements Emitter is
+#line 1697 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ bequ1c(self.n[0], slots[4].node.constant.value as uint8); 
+end sub;
+sub emit_63 implements Emitter is
+#line 1273 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ R_flush(REG_A); E("\tand a,(hl)\n"); 
+end sub;
+sub emit_64 implements Emitter is
+#line 1706 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	var v := slots[4].node.constant.value as uint8;
+	if v == 0 then
+		E_or(REG_A);
+	else
+		E_cpi(v);
+	end if;
+	E_jumps_jc_jnc(self.n[0]);
+
+end sub;
+sub emit_65 implements Emitter is
+#line 1276 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_andi(slots[4].node.constant.value as uint8); 
+end sub;
+sub emit_66 implements Emitter is
+#line 1725 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_subi(slots[4].node.constant.value as uint8);
+	E("\tjp po, $+5\n");
+	E_xori(0x80);
+	E_jumps_jm_jp(self.n[0]);
+
+end sub;
+sub emit_67 implements Emitter is
+#line 911 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_pop(selfreg); 
+end sub;
+sub emit_68 implements Emitter is
+#line 1072 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	if (slots[5].reg & (REG_IX|REG_IY)) != 0 then
+		E_store8i(loreg(slots[1].reg), slots[5].reg, 0);
+		E_store8i(hireg(slots[1].reg), slots[5].reg, 1);
+	else
+		E_storem(loreg(slots[1].reg));
+		E_inc(REG_HL);
+		E_storem(hireg(slots[1].reg));
+	end if;
+
+end sub;
+sub emit_69 implements Emitter is
+#line 1742 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ bequ2c(self.n[0], slots[4].node.constant.value as uint16); 
+end sub;
+sub emit_70 implements Emitter is
+#line 1282 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ R_flush(REG_A); E("\txor a,(hl)\n"); 
+end sub;
+sub emit_71 implements Emitter is
+#line 1285 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_xori(slots[4].node.constant.value as uint8); 
+end sub;
+sub emit_72 implements Emitter is
+#line 1240 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ R_flush(REG_A); E("\tsub a,(hl)\n"); 
+end sub;
+sub emit_73 implements Emitter is
+#line 1767 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ bequ4c(self.n[0], slots[4].node.constant.value); 
+end sub;
+sub emit_74 implements Emitter is
+#line 1770 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_callhelper("_cmpu4");
+	E_jumps_jc_jnc(self.n[0]);
+
+end sub;
+sub emit_75 implements Emitter is
+#line 1776 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_callhelper("_cmps4");
+	E_jumps_jm_jp(self.n[0]);
+
+end sub;
+sub emit_78 implements Emitter is
+#line 1796 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_exx();
+	E_push(slots[1].reg);
+	E_exx();
+	if slots[1].reg == REG_HLHL then
+		E_ex(); # quickly move to DE
+	elseif slots[1].reg == REG_BCBC then
+		E_mov(REG_D, REG_B);
+		E_mov(REG_E, REG_C);
+	end if;
+	E_pop(REG_BC);
+
+end sub;
+sub emit_79 implements Emitter is
+#line 1810 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	if slots[0].node.whencase.value == 0 then
+		E_or(REG_A);
+	else
+		E_cpi(slots[0].node.whencase.value as uint8);
+	end if;
+	E_jnz(slots[0].node.whencase.falselabel);
+
+end sub;
+sub emit_80 implements Emitter is
+#line 1838 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	case2(slots[0].node.whencase.value as uint16, REG_DE, slots[0].node.whencase.falselabel);
+
+end sub;
+sub emit_81 implements Emitter is
+#line 1843 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	case2(slots[0].node.whencase.value as uint16, REG_DE, slots[0].node.whencase.falselabel);
+	case2((slots[0].node.whencase.value >> 16) as uint16, REG_BC, slots[0].node.whencase.falselabel);
+
+end sub;
+sub emit_85 implements Emitter is
+#line 1910 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_mov(REG_A, loreg(slots[1].reg)); 
+end sub;
+sub emit_86 implements Emitter is
+#line 1919 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_mov(REG_A, loreg(slots[1].reg)); 
+end sub;
+sub emit_88 implements Emitter is
+#line 1932 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	R_flush(selfreg);
+	E("\tld ");
+	E_reg(selfreg);
+	E_comma();
+	E_string(slots[0].node.string.text);
+	E_nl();
+
+end sub;
+sub emit_89 implements Emitter is
+#line 1944 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	EmitterOpenStream(current_subr);
+	E_symref(&slots[0].node.startinit.sym, 0);
+	E(":\n");
+
+end sub;
+sub emit_90 implements Emitter is
+#line 1951 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	EmitterCloseStream();
+
+end sub;
+sub emit_91 implements Emitter is
+#line 1956 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E("\tdb ");
+	E_u8(slots[0].node.init.value as uint8);
+	E_nl();
+
+end sub;
+sub emit_92 implements Emitter is
+#line 1963 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E("\tdw ");
+	E_u16(slots[0].node.init.value as uint16);
+	E_nl();
+
+end sub;
+sub emit_93 implements Emitter is
+#line 1970 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E("\tdword ");
+	E_u32(slots[0].node.init.value as uint32);
+	E_nl();
+
+end sub;
+sub emit_94 implements Emitter is
+#line 1977 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E("\tdw ");
+	E_symref(&slots[0].node.initaddress.sym, slots[0].node.initaddress.off);
+	E_nl();
+
+end sub;
+sub emit_95 implements Emitter is
+#line 1984 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E("\tdw ");
+	E_subref(slots[0].node.initsubref.subr);
+	E_nl();
+
+end sub;
+sub emit_96 implements Emitter is
+#line 1991 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E("\tdw ");
+	E_string(slots[0].node.initstring.text);
+	E_nl();
+
+end sub;
+sub emit_99 implements Emitter is
+#line 2003 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	R_flushall();
+	E_tab();
+
+end sub;
+sub emit_100 implements Emitter is
+#line 2009 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E(slots[0].node.asmtext.text);
+	E_space();
+
+end sub;
+sub emit_101 implements Emitter is
+#line 2015 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_symref(&slots[0].node.asmsymbol.sym, 0);
+	E_space();
+
+end sub;
+sub emit_102 implements Emitter is
+#line 2021 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_subref(slots[0].node.asmsubref.subr);
+	E_space();
+
+end sub;
+sub emit_104 implements Emitter is
+#line 2027 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+    E_nl();
+
+end sub;
+sub emit_106 implements Emitter is
+#line 732 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_label(slots[0].node.label.label);
+
+end sub;
+sub emit_107 implements Emitter is
+#line 737 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_jp(slots[0].node.jump.label);
+
+end sub;
+sub emit_108 implements Emitter is
+#line 744 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	RegCacheReset();
+
+	EmitterOpenStream(current_subr);
+
+	E("\n\n\t; ");
+	E(current_subr.name);
+	E(" workspace at ");
+	E_b8(COO_ESCAPE_WSREF);
+	E_b16(current_subr.id);
+	E_b8(0);
+	E_b16(0);
+	E(" length ");
+	E_b8(COO_ESCAPE_WSSIZE);
+	E_b16(current_subr.id);
+	E_b8(0);
+	E_nl();
+
+	E_b8(COO_ESCAPE_THISSUB);
+	E(":\n");
+
+	var count := current_subr.num_input_parameters;
+	var lastparam := count - 1;
+	var popped: uint8 := 0;
+
+	sub pop_return_address() is
+		if popped == 0 then
+			E_pop(REG_BC);
+			popped := 1;
+		end if;
+	end sub;
+
+	while count != 0 loop
+		count := count - 1;
+		var param := GetInputParameter(current_subr, count);
+
+		case param.width is
+			when 1:
+				if count != lastparam then
+					pop_return_address();
+					E_pop(REG_A);
+				end if;
+				E_sta(param as [Symbol], 0);
+
+			when 2:
+				if count != lastparam then
+					pop_return_address();
+					E_pop(REG_HL);
+				end if;
+				E_store16(REG_HL, param as [Symbol], 0);
+
+			when 4:
+				if count != lastparam then
+					pop_return_address();
+					E_pop(REG_HL);
+					E_store16(REG_HL, param as [Symbol], 0);
+					E_pop(REG_HL);
+					E_store16(REG_HL, param as [Symbol], 2);
+				else
+					E_store16(REG_HL, param as [Symbol], 0);
+					E_exx();
+					E_store16(REG_HL, param as [Symbol], 2);
+					E_exx();
+					RegCacheLeavesValue(REG_HLHL, param as [Symbol], 0);
+				end if;
+		end case;
+	end loop;
+
+	if popped != 0 then
+		E_push(REG_BC);
+	end if;
+
+end sub;
+sub emit_109 implements Emitter is
+#line 818 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	R_flushall();
+
+	E("end_");
+	E_subref(current_subr);
+	E(":\n");
+
+	var count: uint8 := 0;
+	var params := current_subr.num_output_parameters;
+	var pushed: uint8 := 0;
+
+	sub push_return_address() is
+		if pushed == 0 then
+			E_pop(REG_BC);
+			pushed := 1;
+		end if;
+	end sub;
+
+	while count != params loop
+		var param := GetOutputParameter(current_subr, count);
+
+		case param.width is
+			when 1:
+				E_lda(param as [Symbol], 0);
+				if count != (params-1) then
+					push_return_address();
+					E_push(REG_A);
+				end if;
+
+			when 2:
+				E_load16(REG_HL, param as [Symbol], 0);
+				if count != (params-1) then
+					push_return_address();
+					E_push(REG_HL);
+				end if;
+
+			when 4:
+				if count != (params-1) then
+					push_return_address();
+					E_load16(REG_HL, param as [Symbol], 2);
+					E_push(REG_HL);
+					E_load16(REG_HL, param as [Symbol], 0);
+					E_push(REG_HL);
+				else
+					E_load16(REG_HL, param as [Symbol], 0);
+					E_exx();
+					E_load16(REG_HL, param as [Symbol], 2);
+					E_exx();
+				end if;
+		end case;
+
+		count := count + 1;
+	end loop;
+
+	if pushed != 0 then
+		E_push(REG_BC);
+	end if;
+	E_ret();
+
+	EmitterCloseStream();
+
+end sub;
+sub emit_110 implements Emitter is
+#line 896 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ CallI(); 
+end sub;
+sub emit_112 implements Emitter is
+#line 903 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_push(slots[4].reg); 
+end sub;
+sub emit_113 implements Emitter is
+#line 904 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_push(slots[4].reg); 
+end sub;
+sub emit_114 implements Emitter is
+#line 905 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ ArchEmitMove(slots[4].reg, 0); 
+end sub;
+sub emit_115 implements Emitter is
+#line 915 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+    if current_subr.num_output_parameters == 0 then
+		E_ret();
+	else
+		E("\tjr end_");
+		E_subref(current_subr);
+		E("\n");
+	end if;
+
+end sub;
+sub emit_116 implements Emitter is
+#line 928 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	if (slots[0].node.constant.value == 0) and (selfreg == REG_A) then
+		E_xor(REG_A);
+	else
+		E_mvi(selfreg, slots[0].node.constant.value as uint8);
+	end if;
+
+end sub;
+sub emit_117 implements Emitter is
+#line 937 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_lxi(selfreg, slots[0].node.constant.value as uint16);
+
+end sub;
+sub emit_118 implements Emitter is
+#line 942 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_lxia(selfreg, &slots[0].node.address.sym, slots[0].node.address.off);
+
+end sub;
+sub emit_119 implements Emitter is
+#line 947 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	R_flush(selfreg);
+	E("\tld ");
+	E_reg(selfreg);
+	E_comma();
+	E_subref(slots[0].node.subref.subr);
+	E_nl();
+
+end sub;
+sub emit_120 implements Emitter is
+#line 957 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	var cache := RegCacheFindConstant(slots[0].node.constant.value as uint32);
+	if (cache & selfreg) != 0 then
+		# Value already in the right register.
+		return;
+	end if;
+
+	if (slots[0].node.constant.value == 0) and (selfreg == REG_HLHL) then
+		E_rcf();
+		E_sbc(REG_HL, REG_HL);
+		E_exx();
+		E_sbc(REG_HL, REG_HL);
+		E_exx();
+	else
+		E_lxi(wordreg(selfreg), slots[0].node.constant.value as uint16);
+		E_exx();
+		E_lxi(wordreg(selfreg), (slots[0].node.constant.value>>16) as uint16);
+		E_exx();
+	end if;
+	RegCacheLeavesConstant(selfreg, slots[0].node.constant.value as uint32);
+
+end sub;
+sub emit_121 implements Emitter is
+#line 996 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_loada(slots[1].reg); 
+end sub;
+sub emit_122 implements Emitter is
+#line 1044 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	if (slots[1].reg & (REG_IX|REG_IY)) != 0 then
+		E_load8i(loreg(selfreg), slots[1].reg, 0);
+		E_load8i(hireg(selfreg), slots[1].reg, 1);
+	elseif slots[1].reg == selfreg then
+		E_loadm(REG_A);
+		E_inc(REG_HL);
+		E_loadm(hireg(selfreg));
+		E_mov(loreg(selfreg), REG_A);
+	else
+		E_loadm(loreg(selfreg));
+		E_inc(REG_HL);
+		E_loadm(hireg(selfreg));
+	end if;
+
+end sub;
+sub emit_123 implements Emitter is
+#line 1107 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	if slots[1].reg == REG_HL then
+		E_loadm(loreg(selfreg));           #  7
+		E_inc(REG_HL);                #  6
+		E_loadm(hireg(selfreg));           #  7
+		E_inc(REG_HL);                #  6
+		E_push(REG_HL);               # 11
+		E_exx();                      #  4
+		E_pop(REG_HL);                # 10
+		E_loadm(loreg(selfreg));           #  7
+		E_inc(REG_HL);                #  6
+		E_loadm(hireg(selfreg));           #  7
+		E_exx();                      # 71 t-states
+	else
+		E_load8i(loreg(selfreg), slots[1].reg, 0); # 19
+		E_load8i(hireg(selfreg), slots[1].reg, 1); # 19
+		E_exx();                      #  4
+		E_load8i(loreg(selfreg), slots[1].reg, 2); # 19
+		E_load8i(hireg(selfreg), slots[1].reg, 3); # 19
+		E_exx();                      #  4
+		                              # 85 t-states
+	end if;
+
+end sub;
+sub emit_124 implements Emitter is
+#line 1132 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_load8i(loreg(selfreg), slots[1].reg, 0);
+	E_load8i(hireg(selfreg), slots[1].reg, 1);
+	E_exx();
+	E_load8i(loreg(selfreg), slots[1].reg, 2);
+	E_load8i(hireg(selfreg), slots[1].reg, 3);
+	E_exx();
+
+end sub;
+sub emit_125 implements Emitter is
+#line 1222 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_add(REG_A, slots[4].reg); 
+end sub;
+sub emit_126 implements Emitter is
+#line 1237 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_sub(slots[4].reg); 
+end sub;
+sub emit_127 implements Emitter is
+#line 1249 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_mul1"); 
+end sub;
+sub emit_128 implements Emitter is
+#line 1252 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_cpl(); 
+end sub;
+sub emit_129 implements Emitter is
+#line 1255 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_xor(REG_A);
+	E_sub(slots[1].reg);
+
+end sub;
+sub emit_130 implements Emitter is
+#line 1261 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_or(slots[4].reg); 
+end sub;
+sub emit_131 implements Emitter is
+#line 1270 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_and(slots[4].reg); 
+end sub;
+sub emit_132 implements Emitter is
+#line 1279 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_xor(slots[4].reg); 
+end sub;
+sub emit_133 implements Emitter is
+#line 1288 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_dvrmu1"); 
+end sub;
+sub emit_134 implements Emitter is
+#line 1291 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_dvrmu1"); 
+end sub;
+sub emit_135 implements Emitter is
+#line 1294 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_dvrms1"); 
+end sub;
+sub emit_136 implements Emitter is
+#line 1297 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_dvrms1"); 
+end sub;
+sub emit_137 implements Emitter is
+#line 1300 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_asr1"); 
+end sub;
+sub emit_138 implements Emitter is
+#line 1303 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_lsr1"); 
+end sub;
+sub emit_139 implements Emitter is
+#line 1306 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_asl1"); 
+end sub;
+sub emit_140 implements Emitter is
+#line 1374 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	if (slots[1].reg != REG_HL) and (slots[4].reg != REG_HL) then
+		if slots[4].reg == REG_DE then
+			E_ex();
+			slots[4].reg := REG_HL;
+		else
+			if slots[1].reg == REG_DE then
+				E_ex();
+			else
+				E_mov(REG_L, loreg(slots[1].reg));
+				E_mov(REG_H, hireg(slots[1].reg));
+			end if;
+			slots[1].reg := REG_HL;
+		end if;
+	end if;
+
+	if slots[1].reg == REG_HL then
+		E_add(REG_HL, slots[4].reg);
+	else
+		E_add(REG_HL, slots[1].reg);
+	end if;
+
+end sub;
+sub emit_141 implements Emitter is
+#line 1398 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_add(selfreg, slots[4].reg); 
+end sub;
+sub emit_142 implements Emitter is
+#line 1401 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_xor(REG_A);
+	E_mov(REG_L, REG_A);
+	E_mov(REG_H, REG_A);
+	E_sbc(REG_HL, slots[1].reg);
+
+end sub;
+sub emit_143 implements Emitter is
+#line 1409 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_rcf();
+	E_sbc(REG_HL, slots[4].reg);
+
+end sub;
+sub emit_144 implements Emitter is
+#line 1444 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_dvrmu2(); 
+end sub;
+sub emit_145 implements Emitter is
+#line 1447 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_dvrmu2(); 
+end sub;
+sub emit_146 implements Emitter is
+#line 1450 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_dvrms2(); 
+end sub;
+sub emit_147 implements Emitter is
+#line 1453 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_dvrms2(); 
+end sub;
+sub emit_148 implements Emitter is
+#line 1456 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_mul2"); 
+end sub;
+sub emit_149 implements Emitter is
+#line 1469 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ logic2(slots[1].reg, slots[4].reg, selfreg, "or"); 
+end sub;
+sub emit_150 implements Emitter is
+#line 1475 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ logic2(slots[1].reg, slots[4].reg, selfreg, "and"); 
+end sub;
+sub emit_151 implements Emitter is
+#line 1481 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ logic2(slots[1].reg, slots[4].reg, selfreg, "xor"); 
+end sub;
+sub emit_152 implements Emitter is
+#line 1487 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_mov(REG_A, loreg(slots[1].reg));
+	E_cpl();
+	E_mov(loreg(selfreg), REG_A);
+	E_mov(REG_A, hireg(slots[1].reg));
+	E_cpl();
+	E_mov(hireg(selfreg), REG_A);
+
+end sub;
+sub emit_153 implements Emitter is
+#line 1497 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_lsr2"); 
+end sub;
+sub emit_154 implements Emitter is
+#line 1500 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_asr2"); 
+end sub;
+sub emit_155 implements Emitter is
+#line 1503 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_asl2"); 
+end sub;
+sub emit_156 implements Emitter is
+#line 1529 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_add(REG_HL, slots[1].reg);
+	E_exx();
+	E_adc(REG_HL, slots[1].reg);
+	E_exx();
+
+end sub;
+sub emit_157 implements Emitter is
+#line 1537 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_rcf();
+	E_sbc(REG_HL, slots[4].reg);
+	E_exx();
+	E_sbc(REG_HL, slots[4].reg);
+	E_exx();
+
+end sub;
+sub emit_158 implements Emitter is
+#line 1546 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_xor(REG_A);
+	E_mov(REG_H, REG_A);
+	E_mov(REG_L, REG_A);
+	E_sbc(REG_HL, slots[1].reg);
+	E_exx();
+	E_mov(REG_H, REG_A);
+	E_mov(REG_L, REG_A);
+	E_sbc(REG_HL, slots[1].reg);
+	E_exx();
+
+end sub;
+sub emit_159 implements Emitter is
+#line 1559 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_mul4"); 
+end sub;
+sub emit_160 implements Emitter is
+#line 1562 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_dvrmu4"); 
+end sub;
+sub emit_161 implements Emitter is
+#line 1565 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_dvrmu4"); 
+end sub;
+sub emit_162 implements Emitter is
+#line 1568 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_dvrms4"); 
+end sub;
+sub emit_163 implements Emitter is
+#line 1571 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_dvrms4"); 
+end sub;
+sub emit_164 implements Emitter is
+#line 1574 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_and4"); 
+end sub;
+sub emit_165 implements Emitter is
+#line 1577 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_or4"); 
+end sub;
+sub emit_166 implements Emitter is
+#line 1580 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_eor4"); 
+end sub;
+sub emit_167 implements Emitter is
+#line 1583 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_not4"); 
+end sub;
+sub emit_168 implements Emitter is
+#line 1586 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_asl4"); 
+end sub;
+sub emit_169 implements Emitter is
+#line 1589 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_lsr4"); 
+end sub;
+sub emit_170 implements Emitter is
+#line 1592 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ E_callhelper("_asr4"); 
+end sub;
+sub emit_171 implements Emitter is
+#line 1694 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ bequ1(self.n[0], slots[1].reg); 
+end sub;
+sub emit_172 implements Emitter is
+#line 1700 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_cp(slots[4].reg);
+	E_jumps_jc_jnc(self.n[0]);
+
+end sub;
+sub emit_173 implements Emitter is
+#line 1717 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_sub(slots[4].reg);
+	E("\tjp po, $+5\n");
+	E_xori(0x80);
+	E_jumps_jm_jp(self.n[0]);
+
+end sub;
+sub emit_174 implements Emitter is
+#line 1739 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ bequ2(self.n[0], slots[1].reg); 
+end sub;
+sub emit_175 implements Emitter is
+#line 1745 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_rcf();
+	E_sbc(REG_HL, slots[4].reg);
+	E_jumps_jc_jnc(self.n[0]);
+
+end sub;
+sub emit_176 implements Emitter is
+#line 1752 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+
+	E_callhelper("_cmps2");
+	E_jumps_jm_jp(self.n[0]);
+
+end sub;
+sub emit_177 implements Emitter is
+#line 1764 ".obj/src/cowbe+gen-z80/preprocessed/gen-z80/preprocessed.i"
+ bequ4(self.n[0]); 
+end sub;
+sub nop_emitter implements Emitter is end sub;
+var emitters: Emitter[] := {
+	emit_0,
+	emit_1,
+	emit_2,
+	emit_3,
+	emit_4,
+	emit_5,
+	emit_6,
+	emit_7,
+	emit_8,
+	emit_9,
+	emit_10,
+	emit_11,
+	emit_12,
+	emit_13,
+	emit_14,
+	emit_15,
+	emit_16,
+	emit_17,
+	emit_18,
+	emit_19,
+	emit_20,
+	emit_21,
+	emit_22,
+	emit_23,
+	emit_24,
+	emit_25,
+	emit_26,
+	emit_27,
+	emit_28,
+	emit_29,
+	emit_30,
+	emit_31,
+	emit_32,
+	emit_33,
+	emit_34,
+	nop_emitter,
+	emit_36,
+	nop_emitter,
+	emit_38,
+	emit_39,
+	emit_40,
+	emit_41,
+	emit_42,
+	emit_43,
+	emit_44,
+	emit_45,
+	emit_46,
+	emit_47,
+	emit_48,
+	emit_49,
+	emit_50,
+	emit_51,
+	emit_52,
+	emit_53,
+	emit_54,
+	emit_55,
+	emit_56,
+	emit_57,
+	emit_58,
+	emit_59,
+	nop_emitter,
+	emit_61,
+	emit_62,
+	emit_63,
+	emit_64,
+	emit_65,
+	emit_66,
+	emit_67,
+	emit_68,
+	emit_69,
+	emit_70,
+	emit_71,
+	emit_72,
+	emit_73,
+	emit_74,
+	emit_75,
+	nop_emitter,
+	nop_emitter,
+	emit_78,
+	emit_79,
+	emit_80,
+	emit_81,
+	nop_emitter,
+	nop_emitter,
+	nop_emitter,
+	emit_85,
+	emit_86,
+	nop_emitter,
+	emit_88,
+	emit_89,
+	emit_90,
+	emit_91,
+	emit_92,
+	emit_93,
+	emit_94,
+	emit_95,
+	emit_96,
+	nop_emitter,
+	nop_emitter,
+	emit_99,
+	emit_100,
+	emit_101,
+	emit_102,
+	nop_emitter,
+	emit_104,
+	nop_emitter,
+	emit_106,
+	emit_107,
+	emit_108,
+	emit_109,
+	emit_110,
+	nop_emitter,
+	emit_112,
+	emit_113,
+	emit_114,
+	emit_115,
+	emit_116,
+	emit_117,
+	emit_118,
+	emit_119,
+	emit_120,
+	emit_121,
+	emit_122,
+	emit_123,
+	emit_124,
+	emit_125,
+	emit_126,
+	emit_127,
+	emit_128,
+	emit_129,
+	emit_130,
+	emit_131,
+	emit_132,
+	emit_133,
+	emit_134,
+	emit_135,
+	emit_136,
+	emit_137,
+	emit_138,
+	emit_139,
+	emit_140,
+	emit_141,
+	emit_142,
+	emit_143,
+	emit_144,
+	emit_145,
+	emit_146,
+	emit_147,
+	emit_148,
+	emit_149,
+	emit_150,
+	emit_151,
+	emit_152,
+	emit_153,
+	emit_154,
+	emit_155,
+	emit_156,
+	emit_157,
+	emit_158,
+	emit_159,
+	emit_160,
+	emit_161,
+	emit_162,
+	emit_163,
+	emit_164,
+	emit_165,
+	emit_166,
+	emit_167,
+	emit_168,
+	emit_169,
+	emit_170,
+	emit_171,
+	emit_172,
+	emit_173,
+	emit_174,
+	emit_175,
+	emit_176,
+	emit_177,
+};
+(emitters[ruleid as @indexof emitters])();
+end sub;
+var codegen_midcodes: uint8[] := {
+ 50,  40,  45,  158,  40, # 0
+ 51,  40,  46,  158,  40, # 1
+ 50,  45,  158,  40, # 2
+ 51,  46,  158,  40, # 3
+ 52,  47,  158,  40, # 4
+ 45,  158,  40, # 5
+ 52,  40,  47,  42, # 6
+ 46,  158,  40, # 7
+ 47,  158,  40, # 8
+ 118,  40, # 9
+ 123,  40, # 10
+ 128,  40, # 11
+ 157,  40, # 12
+ 157,  40, # 13
+ 132,  40, # 14
+ 56,  40,  40, # 15
+ 29,  31,  43, # 16
+ 62,  40, # 17
+ 29,  32,  43, # 18
+ 63,  40, # 19
+ 29,  33,  43, # 20
+ 64,  40, # 21
+ 50,  45,  42, # 22
+ 117,  40, # 23
+ 122,  40, # 24
+ 127,  40, # 25
+ 158,  40, # 26
+ 158,  40, # 27
+ 92,  46,  42, # 28
+ 97,  47,  42, # 29
+ 51,  46,  42, # 30
+ 52,  47,  42, # 31
+ 37, # 32
+ 45,  42, # 33
+ 29,  43, # 34
+ 37, # 35
+ 29,  32, # 36
+ 38, # 37
+ 50,  45, # 38
+ 29,  31, # 39
+ 173,  40, # 40
+ 157,  40, # 41
+ 168,  40, # 42
+ 47,  42, # 43
+ 178,  40, # 44
+ 88, # 45
+ 88, # 46
+ 89, # 47
+ 89, # 48
+ 94, # 49
+ 94, # 50
+ 38, # 51
+ 52,  47, # 52
+ 92,  46, # 53
+ 46,  42, # 54
+ 157,  45, # 55
+ 97,  47, # 56
+ 29,  33, # 57
+ 172,  45, # 58
+ 172,  40, # 59
+ 36, # 60
+ 132,  40, # 61
+ 57,  40, # 62
+ 167,  45, # 63
+ 67,  40, # 64
+ 167,  40, # 65
+ 62,  40, # 66
+ 36, # 67
+ 51,  46, # 68
+ 58,  40, # 69
+ 177,  45, # 70
+ 177,  40, # 71
+ 132,  45, # 72
+ 59,  40, # 73
+ 69, # 74
+ 64, # 75
+ 72, # 76
+ 73, # 77
+ 74, # 78
+ 77, # 79
+ 78, # 80
+ 79, # 81
+ 82, # 82
+ 83, # 83
+ 84, # 84
+ 92, # 85
+ 97, # 86
+ 98, # 87
+ 41, # 88
+  6, # 89
+ 15, # 90
+  8, # 91
+  9, # 92
+ 10, # 93
+ 13, # 94
+ 14, # 95
+ 12, # 96
+ 16, # 97
+ 17, # 98
+ 18, # 99
+ 19, # 100
+ 20, # 101
+ 21, # 102
+  2, # 103
+ 23, # 104
+  3, # 105
+ 26, # 106
+ 27, # 107
+  4, # 108
+  5, # 109
+ 29, # 110
+  1, # 111
+ 31, # 112
+ 32, # 113
+ 33, # 114
+ 28, # 115
+ 40, # 116
+ 40, # 117
+ 42, # 118
+ 43, # 119
+ 40, # 120
+ 45, # 121
+ 46, # 122
+ 47, # 123
+ 47, # 124
+ 157, # 125
+ 132, # 126
+ 162, # 127
+ 107, # 128
+ 112, # 129
+ 172, # 130
+ 167, # 131
+ 177, # 132
+ 137, # 133
+ 147, # 134
+ 142, # 135
+ 152, # 136
+ 127, # 137
+ 122, # 138
+ 117, # 139
+ 158, # 140
+ 158, # 141
+ 113, # 142
+ 133, # 143
+ 138, # 144
+ 148, # 145
+ 143, # 146
+ 153, # 147
+ 163, # 148
+ 173, # 149
+ 168, # 150
+ 178, # 151
+ 108, # 152
+ 123, # 153
+ 128, # 154
+ 118, # 155
+ 159, # 156
+ 134, # 157
+ 114, # 158
+ 164, # 159
+ 139, # 160
+ 149, # 161
+ 144, # 162
+ 154, # 163
+ 169, # 164
+ 174, # 165
+ 179, # 166
+ 109, # 167
+ 119, # 168
+ 124, # 169
+ 129, # 170
+ 57, # 171
+ 67, # 172
+ 62, # 173
+ 58, # 174
+ 68, # 175
+ 63, # 176
+ 59, # 177
+};
+var codegen_registers: RegId[] := {
+0x6000, # 0
+0x6000, # 1
+0x2b, 0x6000, # 2
+0x380, 0x6000, # 3
+0x1c00, 0x6000, # 4
+0x6000, # 5
+# 6
+0x6000, # 7
+0x6000, # 8
+0x80, # 9
+0xffffffff, # 10
+0xffffffff, # 11
+0xffffffff, # 12
+0xffffffff, # 13
+0xffffffff, # 14
+# 15
+0x8000, 0x1, # 16
+0x1, # 17
+0x8000, 0x80, # 18
+0x380, # 19
+0x8000, 0x400, # 20
+0x1c00, # 21
+0x1, # 22
+0x1, # 23
+0xffffffff, # 24
+0xffffffff, # 25
+0xffffffff, # 26
+0xffffffff, # 27
+# 28
+# 29
+0x6380, # 30
+0x1c00, # 31
+# 32
+# 33
+0x8000, # 34
+# 35
+0x8000, 0x80, 0x100, # 36
+# 37
+0x1, 0x380, # 38
+0x8000, 0x1, 0x100, # 39
+0x380, # 40
+0x1, # 41
+0x380, # 42
+# 43
+0x380, # 44
+0x1, # 45
+0x1, # 46
+0x1, # 47
+0x1, # 48
+0x80, # 49
+0x80, # 50
+# 51
+0x1c00, 0x6080, # 52
+0x6380, # 53
+# 54
+0x1, 0x80, # 55
+0x6380, # 56
+0x8000, 0x400, 0x100, # 57
+0x1, 0x80, # 58
+0x1, # 59
+# 60
+0x1, # 61
+0x1, # 62
+0x1, 0x80, # 63
+0x1, # 64
+0x1, # 65
+0x1, # 66
+# 67
+0x380, 0x6080, # 68
+0x80, # 69
+0x1, 0x80, # 70
+0x1, # 71
+0x1, 0x80, # 72
+0x400, # 73
+0x400, 0x800, # 74
+0x400, 0x800, # 75
+0x1, # 76
+0x100, # 77
+0x1c00, # 78
+# 79
+# 80
+# 81
+# 82
+# 83
+# 84
+0x380, # 85
+0x1c00, # 86
+0x400, # 87
+# 88
+# 89
+# 90
+# 91
+# 92
+# 93
+# 94
+# 95
+# 96
+# 97
+# 98
+# 99
+# 100
+# 101
+# 102
+# 103
+# 104
+# 105
+# 106
+# 107
+# 108
+# 109
+0x8000, 0x100, # 110
+# 111
+0x8000, 0x2b, # 112
+0x8000, 0x380, # 113
+0x8000, 0x1c00, # 114
+# 115
+# 116
+# 117
+# 118
+# 119
+# 120
+0x6380, # 121
+0x6080, # 122
+0x6080, # 123
+0x6000, # 124
+0x1, 0x2a, # 125
+0x1, 0x2a, # 126
+0x8, 0x20, # 127
+0x1, # 128
+0x2a, # 129
+0x1, 0x2a, # 130
+0x1, 0x2a, # 131
+0x1, 0x2a, # 132
+0x20, 0x8, # 133
+0x20, 0x8, # 134
+0x20, 0x8, # 135
+0x20, 0x8, # 136
+0x1, 0x2, # 137
+0x1, 0x2, # 138
+0x1, 0x2, # 139
+0x380, 0x380, # 140
+0xffffffff, 0x300, # 141
+0x300, # 142
+0x80, 0x300, # 143
+0x200, 0x100, # 144
+0x200, 0x100, # 145
+0x200, 0x100, # 146
+0x200, 0x100, # 147
+0x100, 0x200, # 148
+0x380, 0x380, # 149
+0x380, 0x380, # 150
+0x380, 0x380, # 151
+0x380, # 152
+0x80, 0x1, # 153
+0x80, 0x1, # 154
+0x80, 0x1, # 155
+0x1800, 0x400, # 156
+0x400, 0x1800, # 157
+0x1800, # 158
+0x1000, 0x800, # 159
+0x1000, 0x800, # 160
+0x1000, 0x800, # 161
+0x1000, 0x800, # 162
+0x1000, 0x800, # 163
+0x800, 0x400, # 164
+0x800, 0x400, # 165
+0x800, 0x400, # 166
+0x400, # 167
+0x400, 0x1, # 168
+0x400, 0x1, # 169
+0x400, 0x1, # 170
+0x2a, 0x1, # 171
+0x1, 0x2a, # 172
+0x1, 0x2a, # 173
+0x300, 0x80, # 174
+0x80, 0x300, # 175
+0x80, 0x100, # 176
+0x800, 0x400, # 177
+};
+var codegen_rules: Rule[] := {
+	{ 0x01, 0x0, 0x0, 0x0, 179, 243, 64 }, # 0
+	{ 0x01, 0x0, 0x0, 0x1, 179, 243, 64 }, # 1
+	{ 0x01, 0x0, 0x0, 0x0, 177, 243, 66 }, # 2
+	{ 0x01, 0x0, 0x0, 0x1, 177, 243, 66 }, # 3
+	{ 0x01, 0x0, 0x0, 0x0, 177, 243, 66 }, # 4
+	{ 0x01, 0x2b, 0x2b, 0x0, 11, 15, 4 }, # 5
+	{ 0x00, 0x0, 0x0, 0x4e0, 51, 51, 0 }, # 6
+	{ 0x01, 0x6380, 0x380, 0x0, 11, 15, 4 }, # 7
+	{ 0x01, 0x1c00, 0x1c00, 0x0, 11, 15, 4 }, # 8
+	{ 0x01, 0x6380, 0x80, 0x0, 17, 19, 2 }, # 9
+	{ 0x01, 0x6380, 0x6380, 0x0, 17, 19, 2 }, # 10
+	{ 0x01, 0x6380, 0x6380, 0x0, 17, 19, 2 }, # 11
+	{ 0x01, 0x2b, 0x2b, 0x0, 17, 19, 2 }, # 12
+	{ 0x01, 0x2b, 0x2b, 0x0, 17, 19, 2 }, # 13
+	{ 0x01, 0x2b, 0x2b, 0x0, 17, 19, 2 }, # 14
+	{ 0x00, 0x0, 0x0, 0xffff, 19, 19, 0 }, # 15
+	{ 0x00, 0x0, 0x0, 0x7ffe, 19, 31, 12 }, # 16
+	{ 0x01, 0x0, 0x0, 0xffff, 17, 19, 2 }, # 17
+	{ 0x00, 0x0, 0x0, 0x7b1f, 19, 31, 12 }, # 18
+	{ 0x01, 0x0, 0x0, 0xffff, 17, 19, 2 }, # 19
+	{ 0x00, 0x0, 0x0, 0x7b1f, 19, 31, 12 }, # 20
+	{ 0x01, 0x0, 0x0, 0xffff, 17, 19, 2 }, # 21
+	{ 0x00, 0x0, 0x0, 0x0, 49, 51, 2 }, # 22
+	{ 0x01, 0x2b, 0x1, 0x0, 17, 19, 2 }, # 23
+	{ 0x01, 0x2b, 0x2b, 0x0, 17, 19, 2 }, # 24
+	{ 0x01, 0x2b, 0x2b, 0x0, 17, 19, 2 }, # 25
+	{ 0x01, 0x6380, 0x6380, 0x0, 17, 19, 2 }, # 26
+	{ 0x01, 0x6380, 0x6380, 0x0, 17, 19, 2 }, # 27
+	{ 0x00, 0x2b, 0x1, 0x0, 7, 7, 0 }, # 28
+	{ 0x00, 0x2b, 0x1, 0x0, 7, 7, 0 }, # 29
+	{ 0x00, 0x0, 0x0, 0x0, 49, 51, 2 }, # 30
+	{ 0x00, 0x0, 0x0, 0x0, 49, 51, 2 }, # 31
+	{ 0x01, 0x6380, 0x6380, 0x0, 1, 1, 0 }, # 32
+	{ 0x00, 0x2b, 0x1, 0x0, 3, 3, 0 }, # 33
+	{ 0x00, 0x0, 0x0, 0x7fff, 17, 19, 2 }, # 34
+	{ 0x01, 0x6380, 0x80, 0x0, 1, 1, 0 }, # 35
+	{ 0x00, 0x0, 0x0, 0x7207, 3, 31, 28 }, # 36
+	{ 0x01, 0x1c00, 0x400, 0x0, 1, 1, 0 }, # 37
+	{ 0x00, 0x0, 0x0, 0x0, 17, 51, 34 }, # 38
+	{ 0x00, 0x0, 0x0, 0x76e6, 3, 31, 28 }, # 39
+	{ 0x00, 0x6380, 0x380, 0x1, 17, 19, 2 }, # 40
+	{ 0x00, 0x2b, 0x1, 0x0, 17, 19, 2 }, # 41
+	{ 0x00, 0x6380, 0x380, 0x1, 17, 19, 2 }, # 42
+	{ 0x00, 0x1c00, 0x1c00, 0x0, 3, 3, 0 }, # 43
+	{ 0x00, 0x6380, 0x380, 0x1, 17, 19, 2 }, # 44
+	{ 0x01, 0x6380, 0x380, 0x0, 1, 3, 2 }, # 45
+	{ 0x01, 0x6380, 0x380, 0x0, 1, 3, 2 }, # 46
+	{ 0x01, 0x1c00, 0x1c00, 0x0, 1, 3, 2 }, # 47
+	{ 0x01, 0x1c00, 0x1c00, 0x0, 1, 3, 2 }, # 48
+	{ 0x01, 0x1c00, 0x400, 0x0, 1, 3, 2 }, # 49
+	{ 0x01, 0x1c00, 0x400, 0x1, 1, 3, 2 }, # 50
+	{ 0x01, 0x1c00, 0x1c00, 0x0, 1, 1, 0 }, # 51
+	{ 0x00, 0x0, 0x0, 0x0, 17, 51, 34 }, # 52
+	{ 0x00, 0x2b, 0x1, 0x0, 3, 7, 4 }, # 53
+	{ 0x00, 0x6380, 0x6380, 0x0, 3, 3, 0 }, # 54
+	{ 0x00, 0x2b, 0x1, 0x0, 17, 51, 34 }, # 55
+	{ 0x00, 0x2b, 0x1, 0x0, 3, 7, 4 }, # 56
+	{ 0x00, 0x0, 0x0, 0x7207, 3, 31, 28 }, # 57
+	{ 0x00, 0x2b, 0x1, 0x0, 17, 51, 34 }, # 58
+	{ 0x00, 0x2b, 0x1, 0x0, 17, 19, 2 }, # 59
+	{ 0x01, 0x2b, 0x1, 0x0, 1, 1, 0 }, # 60
+	{ 0x00, 0x2b, 0x1, 0x0, 17, 19, 2 }, # 61
+	{ 0x00, 0x0, 0x0, 0xffff, 17, 19, 2 }, # 62
+	{ 0x00, 0x2b, 0x1, 0x0, 17, 51, 34 }, # 63
+	{ 0x00, 0x0, 0x0, 0xffff, 17, 19, 2 }, # 64
+	{ 0x00, 0x2b, 0x1, 0x0, 17, 19, 2 }, # 65
+	{ 0x00, 0x0, 0x0, 0xffff, 17, 19, 2 }, # 66
+	{ 0x01, 0x2b, 0x2b, 0x0, 1, 1, 0 }, # 67
+	{ 0x00, 0x0, 0x0, 0x1, 17, 51, 34 }, # 68
+	{ 0x00, 0x0, 0x0, 0xffff, 17, 19, 2 }, # 69
+	{ 0x00, 0x2b, 0x1, 0x0, 17, 51, 34 }, # 70
+	{ 0x00, 0x2b, 0x1, 0x0, 17, 19, 2 }, # 71
+	{ 0x00, 0x2b, 0x1, 0x0, 17, 51, 34 }, # 72
+	{ 0x00, 0x0, 0x0, 0xffff, 17, 19, 2 }, # 73
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 19, 18 }, # 74
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 19, 18 }, # 75
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 3, 2 }, # 76
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 3, 2 }, # 77
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 3, 2 }, # 78
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 1, 0 }, # 79
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 1, 0 }, # 80
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 1, 0 }, # 81
+	{ 0x00, 0x0, 0x0, 0x0, 1, 1, 0 }, # 82
+	{ 0x00, 0x0, 0x0, 0x0, 1, 1, 0 }, # 83
+	{ 0x00, 0x0, 0x0, 0x0, 1, 1, 0 }, # 84
+	{ 0x00, 0x2b, 0x1, 0x0, 1, 3, 2 }, # 85
+	{ 0x00, 0x2b, 0x1, 0x0, 1, 3, 2 }, # 86
+	{ 0x00, 0x6380, 0x80, 0x0, 1, 3, 2 }, # 87
+	{ 0x00, 0x6380, 0x380, 0x0, 1, 1, 0 }, # 88
+	{ 0x00, 0x0, 0x0, 0x0, 1, 1, 0 }, # 89
+	{ 0x00, 0x0, 0x0, 0x0, 1, 1, 0 }, # 90
+	{ 0x00, 0x0, 0x0, 0x0, 1, 1, 0 }, # 91
+	{ 0x00, 0x0, 0x0, 0x0, 1, 1, 0 }, # 92
+	{ 0x00, 0x0, 0x0, 0x0, 1, 1, 0 }, # 93
+	{ 0x00, 0x0, 0x0, 0x0, 1, 1, 0 }, # 94
+	{ 0x00, 0x0, 0x0, 0x0, 1, 1, 0 }, # 95
+	{ 0x00, 0x0, 0x0, 0x0, 1, 1, 0 }, # 96
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 1, 0 }, # 97
+	{ 0x00, 0x0, 0x0, 0x0, 1, 1, 0 }, # 98
+	{ 0x00, 0x0, 0x0, 0x0, 1, 1, 0 }, # 99
+	{ 0x00, 0x0, 0x0, 0x0, 1, 1, 0 }, # 100
+	{ 0x00, 0x0, 0x0, 0x0, 1, 1, 0 }, # 101
+	{ 0x00, 0x0, 0x0, 0x0, 1, 1, 0 }, # 102
+	{ 0x00, 0x0, 0x0, 0x0, 1, 1, 0 }, # 103
+	{ 0x00, 0x0, 0x0, 0x0, 1, 1, 0 }, # 104
+	{ 0x00, 0x0, 0x0, 0x0, 1, 1, 0 }, # 105
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 1, 0 }, # 106
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 1, 0 }, # 107
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 1, 0 }, # 108
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 1, 0 }, # 109
+	{ 0x00, 0x0, 0x0, 0x76e7, 1, 19, 18 }, # 110
+	{ 0x00, 0x8000, 0x8000, 0x0, 1, 1, 0 }, # 111
+	{ 0x00, 0x8000, 0x8000, 0x0, 1, 19, 18 }, # 112
+	{ 0x00, 0x8000, 0x8000, 0x0, 1, 19, 18 }, # 113
+	{ 0x00, 0x8000, 0x8000, 0x0, 1, 19, 18 }, # 114
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 1, 0 }, # 115
+	{ 0x00, 0x2b, 0x2b, 0x0, 1, 1, 0 }, # 116
+	{ 0x00, 0x6380, 0x6380, 0x0, 1, 1, 0 }, # 117
+	{ 0x00, 0x6380, 0x6380, 0x0, 1, 1, 0 }, # 118
+	{ 0x00, 0x6380, 0x6380, 0x0, 1, 1, 0 }, # 119
+	{ 0x00, 0x1c00, 0x1c00, 0x0, 1, 1, 0 }, # 120
+	{ 0x00, 0x2b, 0x1, 0x0, 1, 3, 2 }, # 121
+	{ 0x00, 0x6380, 0x380, 0x1, 1, 3, 2 }, # 122
+	{ 0x00, 0x1c00, 0x1800, 0x0, 1, 3, 2 }, # 123
+	{ 0x00, 0x1c00, 0x400, 0x0, 1, 3, 2 }, # 124
+	{ 0x00, 0x2b, 0x1, 0x0, 1, 19, 18 }, # 125
+	{ 0x00, 0x2b, 0x1, 0x0, 1, 19, 18 }, # 126
+	{ 0x00, 0x2b, 0x1, 0x1206, 1, 19, 18 }, # 127
+	{ 0x00, 0x2b, 0x1, 0x0, 1, 3, 2 }, # 128
+	{ 0x00, 0x2b, 0x1, 0x0, 1, 3, 2 }, # 129
+	{ 0x00, 0x2b, 0x1, 0x0, 1, 19, 18 }, # 130
+	{ 0x00, 0x2b, 0x1, 0x0, 1, 19, 18 }, # 131
+	{ 0x00, 0x2b, 0x1, 0x0, 1, 19, 18 }, # 132
+	{ 0x00, 0x2b, 0x20, 0x1, 1, 19, 18 }, # 133
+	{ 0x00, 0x2b, 0x1, 0x0, 1, 19, 18 }, # 134
+	{ 0x00, 0x2b, 0x20, 0x1, 1, 19, 18 }, # 135
+	{ 0x00, 0x2b, 0x8, 0x0, 1, 19, 18 }, # 136
+	{ 0x00, 0x2b, 0x1, 0x0, 1, 19, 18 }, # 137
+	{ 0x00, 0x2b, 0x1, 0x1206, 1, 19, 18 }, # 138
+	{ 0x00, 0x2b, 0x1, 0x1206, 1, 19, 18 }, # 139
+	{ 0x00, 0x6380, 0x80, 0x0, 1, 19, 18 }, # 140
+	{ 0x00, 0x6380, 0x6000, 0x0, 1, 19, 18 }, # 141
+	{ 0x00, 0x6380, 0x80, 0x1, 1, 3, 2 }, # 142
+	{ 0x00, 0x6380, 0x80, 0x0, 1, 19, 18 }, # 143
+	{ 0x00, 0x6380, 0x200, 0x4e1, 1, 19, 18 }, # 144
+	{ 0x00, 0x6380, 0x80, 0x1, 1, 19, 18 }, # 145
+	{ 0x00, 0x6380, 0x200, 0x4e1, 1, 19, 18 }, # 146
+	{ 0x00, 0x6380, 0x100, 0x4e1, 1, 19, 18 }, # 147
+	{ 0x00, 0x6380, 0x80, 0x1, 1, 19, 18 }, # 148
+	{ 0x00, 0x6380, 0x380, 0x1, 1, 19, 18 }, # 149
+	{ 0x00, 0x6380, 0x380, 0x1, 1, 19, 18 }, # 150
+	{ 0x00, 0x6380, 0x380, 0x1, 1, 19, 18 }, # 151
+	{ 0x00, 0x6380, 0x380, 0x1, 1, 3, 2 }, # 152
+	{ 0x00, 0x6380, 0x80, 0x0, 1, 19, 18 }, # 153
+	{ 0x00, 0x6380, 0x80, 0x0, 1, 19, 18 }, # 154
+	{ 0x00, 0x6380, 0x80, 0x0, 1, 19, 18 }, # 155
+	{ 0x00, 0x1c00, 0x400, 0x0, 1, 19, 18 }, # 156
+	{ 0x00, 0x1c00, 0x400, 0x0, 1, 19, 18 }, # 157
+	{ 0x00, 0x1c00, 0x400, 0x1, 1, 3, 2 }, # 158
+	{ 0x00, 0x1c00, 0x400, 0x1, 1, 19, 18 }, # 159
+	{ 0x00, 0x1c00, 0x1000, 0x4e1, 1, 19, 18 }, # 160
+	{ 0x00, 0x1c00, 0x400, 0x1, 1, 19, 18 }, # 161
+	{ 0x00, 0x1c00, 0x1000, 0x4e1, 1, 19, 18 }, # 162
+	{ 0x00, 0x1c00, 0x800, 0x4e1, 1, 19, 18 }, # 163
+	{ 0x00, 0x1c00, 0x400, 0x1, 1, 19, 18 }, # 164
+	{ 0x00, 0x1c00, 0x400, 0x1, 1, 19, 18 }, # 165
+	{ 0x00, 0x1c00, 0x400, 0x1, 1, 19, 18 }, # 166
+	{ 0x00, 0x1c00, 0x400, 0x1, 1, 3, 2 }, # 167
+	{ 0x00, 0x1c00, 0x400, 0x0, 1, 19, 18 }, # 168
+	{ 0x00, 0x1c00, 0x400, 0x0, 1, 19, 18 }, # 169
+	{ 0x00, 0x1c00, 0x400, 0x0, 1, 19, 18 }, # 170
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 19, 18 }, # 171
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 19, 18 }, # 172
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 19, 18 }, # 173
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 19, 18 }, # 174
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 19, 18 }, # 175
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 19, 18 }, # 176
+	{ 0x00, 0x0, 0x0, 0xffff, 1, 19, 18 }, # 177
+};
+sub PopulateMatchBuffer(insn: [Instruction], n: [[Node]], matchbuf: [uint8]) is
+	[matchbuf+0] := [n + 0*@bytesof intptr].op;
+	[n + 1*@bytesof intptr] := [n + 0*@bytesof intptr].left;
+	if [n + 1*@bytesof intptr] != (0 as [Node]) then
+	[matchbuf+1] := [n + 1*@bytesof intptr].op;
+	[n + 2*@bytesof intptr] := [n + 1*@bytesof intptr].left;
+	if [n + 2*@bytesof intptr] != (0 as [Node]) then
+	[matchbuf+2] := [n + 2*@bytesof intptr].op;
+	end if;
+	[n + 3*@bytesof intptr] := [n + 1*@bytesof intptr].right;
+	if [n + 3*@bytesof intptr] != (0 as [Node]) then
+	[matchbuf+3] := [n + 3*@bytesof intptr].op;
+	end if;
+	end if;
+	[n + 4*@bytesof intptr] := [n + 0*@bytesof intptr].right;
+	if [n + 4*@bytesof intptr] != (0 as [Node]) then
+	[matchbuf+4] := [n + 4*@bytesof intptr].op;
+	[n + 5*@bytesof intptr] := [n + 4*@bytesof intptr].left;
+	if [n + 5*@bytesof intptr] != (0 as [Node]) then
+	[matchbuf+5] := [n + 5*@bytesof intptr].op;
+	[n + 6*@bytesof intptr] := [n + 5*@bytesof intptr].left;
+	if [n + 6*@bytesof intptr] != (0 as [Node]) then
+	[matchbuf+6] := [n + 6*@bytesof intptr].op;
+	end if;
+	[n + 7*@bytesof intptr] := [n + 5*@bytesof intptr].right;
+	if [n + 7*@bytesof intptr] != (0 as [Node]) then
+	[matchbuf+7] := [n + 7*@bytesof intptr].op;
+	end if;
+	end if;
+	end if;
+end sub;

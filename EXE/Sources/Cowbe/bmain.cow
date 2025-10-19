@@ -1,0 +1,59 @@
+include "cowgol.coh";
+include "argv.coh";
+include "strings.coh";
+include "malloc.coh";
+include "file.coh";
+
+typedef string is [uint8];
+
+var inputfile: string := (0 as string);
+var outputfile: string := (0 as string);
+
+include "coodecls.coh";
+include "btypes.coh";
+include "butils.coh";
+include "balloc.coh";
+include "binsseld.coh";
+include "bmidcode.coh";
+include "bemitter.coh";
+include "binputt.coh";
+include "bcobin.coh";
+include "bregcach.coh";
+include "bcodegen.coh";
+include "btreew.coh";
+include "bprocess.coh";
+
+sub PrintFreeMemory() is
+	print_i16((GetFreeMemory() >> 10) as uint16);
+	print("kB free\n");
+end sub;
+
+sub SyntaxError() is
+	print("syntax error: cowbe [-Ipath] <infile> <outfile>\n");
+	ExitWithError();
+end sub;
+
+sub ParseArguments() is
+	ArgvInit();
+
+	inputfile := ArgvNext();
+	outputfile := ArgvNext();
+	if (ArgvNext() != (0 as string)) or (inputfile == (0 as string))
+			or (outputfile == (0 as string)) then
+		SyntaxError();
+	end if;
+end sub;
+
+print("COWBE: ");
+PrintFreeMemory();
+
+ParseArguments();
+InputterOpenfile(inputfile);
+EmitterOpenfile(outputfile);
+ProcessFile();
+EmitterClosefile();
+InputterClosefile();
+
+print("done: ");
+PrintFreeMemory();
+
