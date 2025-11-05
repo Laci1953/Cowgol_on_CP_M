@@ -33,6 +33,12 @@ This is also very valuable when debugging the app.
 The option -X is used to reserve a larger stack (1KB) for the executable (the usual stack size is 128 bytes). 
 This might be important if reentrant C code is mixed into the project.
 
+The option -B addresses the case when the compiler runs on a computer provided with only 64KB RAM. This option allows the processing of larger cowgol source files.
+What to do when our computer is provided with only 64KB RAM and after a first try we will notice that the compiler fails to compile a medium sized 
+Cowgol source file (~ 20KB, ~1000 lines) ?
+We should try in this case to use the -B option, instructing the compiler to use custom Cowfe components that will be perhaps able to process this file
+(see as an example the game “bowling” in the GAMES folder, which needs -B when compiling-it, otherwise it will fail, reporting ‘Out of memory’).
+
 More than one source file may be specified (with extensions: .cow = cowgol source file, .c = C source file, .as = assembler source file)
 
 Also, C or AS object files (with extension .obj) and Cowgol object files (with extension .coo) may be specified. 
