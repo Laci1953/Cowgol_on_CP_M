@@ -2,7 +2,7 @@ The Bowling game is a good example of using code stored in HiTech libraries.
 
 It must be compiled, on 128KB/512KB RAM computers, using the following command line:
 
->cowgol -o -lcowgol bowling.cow
+>cowgol -b -o -lcowgol bowling.cow
 
 The '-lcowgol' option instructs the LINK linker, at the final stage when building the executable, to include the cowgol.lib in its command line.
 
