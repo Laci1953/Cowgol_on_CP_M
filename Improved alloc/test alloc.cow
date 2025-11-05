@@ -1,0 +1,519 @@
+# cowgol -o misc.coo testmem.cow
+
+# >testmem	:	uses only malloc & free
+# >testmem r	:	uses malloc, realloc & free
+
+include "misc.coh";
+
+var LOMEM: [uint8];
+@asm "ld hl, LOMEM";
+@asm "ld (", LOMEM, "), hl";
+
+var HIMEM: [uint8];
+@asm "ld hl, (6)";
+@asm "ld (", HIMEM, "), hl";
+
+#-----------------------------------------------------------------------------
+# Memory allocation subroutines
+#
+#       Algorithm Copyright 
+#
+# (c) 2002, 2004, 2010 Joerg Wunsch, 
+# (c) 2010  Gerben van den Broeke
+#
+# ported to Cowgol by Ladislau Szilagyi, March 2024
+#
+
+var dummy: [uint8];
+
+record freelist is
+	sz: intptr;	#size of memory chunk
+	nx: [freelist]; #pointer to next free memory chunk
+end record;
+
+# free memory chunks header
+var flp: [freelist] := LOMEM as [freelist];	#list of available (free) chunks of memory
+flp.nx := nil;					#initially, we have a single memory chunk
+flp.sz := (HIMEM - LOMEM - @bytesof(intptr)) as intptr;	#fit in all the available memory
+
+#
+# returns the total size of the available (free) memory (in bytes)
+#
+sub total_free(): (total: uint16) is
+	var fp1:[freelist] := flp;
+	total := 0;
+	while fp1 != 0 as [freelist] loop
+		total := total + fp1.sz;
+		fp1 := fp1.nx;
+	end loop;
+end sub;
+
+#
+# allocate "len" bytes
+# returns NULL if memory full
+#
+sub malloc(len: uint16): (ret: [uint8]) is
+	var fp1: [freelist];
+	var fp2: [freelist];
+	var sfp1: [freelist];
+	var sfp2: [freelist];
+	var cp: [uint8];
+	var s: uint16;
+
+	#  Our minimum chunk size is the size of a pointer (plus the
+	#  size of the "sz" field, but we don't need to account for
+	#  this), otherwise we could not possibly fit a freelist entry
+	#  into the chunk later.
+
+	if len < 2 then
+		len := 2;
+	end if;
+
+	#  First, walk the free list and try finding a chunk that
+	#  would match exactly.  If we found one, we are done.  While
+	#  walking, note down the smallest chunk we found that would
+	#  still fit the request -- we need it for step 2.
+
+	s := 0; fp1 := flp; fp2 := nil;
+	while fp1 != nil loop
+		if fp1.sz < len then
+			fp2 := fp1; fp1 := fp1.nx;
+			continue;
+		end if;
+		if fp1.sz == len then
+
+			#  Found it.  Disconnect the chunk from the
+			#  freelist, and return it.
+
+			if fp2 != nil then
+				fp2.nx := fp1.nx;
+			else
+				flp := fp1.nx;
+			end if;
+			ret := fp1 as [uint8] + @bytesof(intptr); #skip sz;
+			return;
+		else 
+			if s == 0 or fp1.sz < s then
+				s := fp1.sz;
+				sfp1 := fp1;
+				sfp2 := fp2;
+			end if;
+		end if;
+		fp2 := fp1; fp1 := fp1.nx; 
+	end loop;
+
+	#  Step 2: If we found a chunk on the freelist that would fit
+	#  (but was too large), look it up again and use it, since it
+	#  is our closest match now.  Since the freelist entry needs
+	#  to be split into two entries then, watch out that the
+	#  difference between the requested size and the size of the
+	#  chunk found is large enough for another freelist entry; if
+	#  not, just enlarge the request size to what we have found,
+	#  and use the entire chunk.
+
+	if s != 0 then
+		if s - len < 4 then
+			if sfp2 != nil then
+				sfp2.nx := sfp1.nx;
+			else
+				flp := sfp1.nx;
+			end if;
+			ret := sfp1 as [uint8] + @bytesof(intptr); # skip sz
+			return;
+		end if;
+
+		#  Split them up.  Note that we leave the first part
+		#  as the new (smaller) freelist entry, and return the
+		#  upper portion to the caller.  This saves us the
+		#  work to fix up the freelist chain; we just need to
+		#  fixup the size of the current entry, and note down
+		#  the size of the new chunk before returning it to
+		#  the caller.
+
+		cp := sfp1 as [uint8];
+		s := s - len;
+		cp := cp + s;
+		sfp2 := cp as [freelist];
+		sfp2.sz := len;
+		sfp1.sz := s - @bytesof(intptr);
+		ret := sfp2 as [uint8] + @bytesof(intptr); # skip sz
+		return;
+	end if;
+
+	#  Step 4: There's no help, just fail. :-/
+
+	ret := nil;
+end sub;
+
+#
+# allocate "size" bytes and fill the allocated buffer with zeros
+# returns NULL if memory full
+#
+sub calloc(count: uint16, size: uint16): (ret: [uint8]) is
+	var total: uint16 := count * size;
+
+	# alloc first
+
+	ret := malloc(total);
+
+	# if successful, fill with zeros
+
+	if ret != nil then
+		dummy := memset(ret, 0, total);
+	end if;
+end sub;
+
+#
+# free the (previously allocated) buffer
+# !!! using as argument a NOT allocated pointer will crash the system !!!
+#
+sub free(p: [uint8]) is
+	var fp1: [freelist];
+	var fp2: [freelist];
+	var fpnew: [freelist];
+	var cp1: [uint8];
+	var cp2: [uint8];
+	var cpnew: [uint8];
+
+	#  free(NULL) must be a no-op  
+
+	if p == nil then
+		return;
+	end if;
+	cpnew := p - @bytesof(intptr);
+	fpnew := cpnew as [freelist];
+	fpnew.nx := 0 as [freelist];
+
+	#  Now, find the position where our new entry belongs onto the
+	#  freelist.  Try to aggregate the chunk with adjacent chunks
+	#  if possible.
+
+	fp1 := flp; fp2 := nil;
+	while fp1 != nil loop
+	     	if fp1 < fpnew then
+			fp2 := fp1; fp1 := fp1.nx;
+			continue;
+		end if;
+		cp1 := fp1 as [uint8];
+		fpnew.nx := fp1;
+		if fpnew as [uint8] + @bytesof(intptr) + fpnew.sz == cp1 then
+			fpnew.sz := fpnew.sz + fp1.sz + @bytesof(intptr);
+			fpnew.nx := fp1.nx;
+		end if;
+		if fp2 == nil then
+			flp := fpnew;
+			return;
+		end if;
+		break;
+	end loop;
+
+	#  Note that we get here either if we hit the "break" above,
+	#  or if we fell off the end of the loop.  The latter means
+	#  we've got a new topmost chunk.  Either way, try aggregating
+	#  with the lower chunk if possible.
+
+	fp2.nx := fpnew;
+	cp2 := fp2 as [uint8] + @bytesof(intptr);
+	if cp2 + fp2.sz == cpnew then
+		fp2.sz := fp2.sz + fpnew.sz + @bytesof(intptr);
+		fp2.nx := fpnew.nx;
+	end if;
+end sub;
+
+#
+# modify the size of an already allocated buffer, preserving actual data
+# returns NULL if operation is not possible 
+#
+sub realloc(ptr: [uint8], len: uint16): (ret: [uint8]) is
+	var fp1: [freelist];
+	var fp2: [freelist];
+	var fp3: [freelist];
+	var ofp3: [freelist];
+	var cp: [uint8];
+	var cp1: [uint8];
+	var memp: [uint8];
+	var s: uint16;
+	var incr: uint16;
+
+	#  Our minimum chunk size is the size of a pointer (plus the
+	#  size of the "sz" field, but we don't need to account for
+	#  this), otherwise we could not possibly fit a freelist entry
+	#  into the chunk later.
+
+	if len < 2 then
+		len := 2;
+	end if;
+
+	#  Trivial case  
+
+	if ptr == nil then
+		ret := malloc(len);
+		return;
+	end if;
+
+	cp1 := ptr - @bytesof(intptr);
+	fp1 := cp1 as [freelist];
+	cp := ptr + len; 
+	if cp < cp1 then
+
+		#  Pointer wrapped across top of RAM, fail. 
+
+		ret := nil;
+		return;
+	end if;
+
+	#  See whether we are growing or shrinking.  When shrinking,
+	#  we split off a chunk for the released portion, and call
+	#  free() on it.  Therefore, we can only shrink if the new
+	#  size is at least sizeof(struct freelist) smaller than the
+	#  previous size.
+
+	if len <= fp1.sz then
+
+		#  The first test catches a possible unsigned int
+		#  rollover condition.  
+
+		if fp1.sz <= 4 or len > fp1.sz - 4 then
+			ret := ptr;
+			return;
+		end if;
+		fp2 := cp as [freelist];
+		fp2.sz := fp1.sz - len - @bytesof(intptr);
+		fp1.sz := len;
+		free(fp2 as [uint8] + @bytesof(intptr));
+		ret := ptr;
+                return;
+	end if;
+
+	#  If we get here, we are growing.  First, see whether there
+	#  is space in the free list on top of our current chunk.
+
+	incr := len - fp1.sz;
+	cp := ptr + fp1.sz;
+	fp2 := cp as [freelist];
+	s := 0; ofp3 := nil; fp3 := flp;
+	while fp3 != nil loop
+		if fp3 == fp2 and fp3.sz + @bytesof(intptr) >= incr then
+
+			#  found something that fits 
+
+			if fp3.sz > incr + @bytesof(intptr) then
+
+				#  split off a new freelist entry
+
+				cp := ptr + len;
+				fp2 := cp as [freelist];
+				fp2.nx := fp3.nx;
+				fp2.sz := fp3.sz - incr;
+				fp1.sz := len;
+			else
+				#  it just fits, so use it entirely
+
+				fp1.sz := fp1.sz + fp3.sz + @bytesof(intptr);
+				fp2 := fp3.nx;
+			end if;
+			if ofp3 != nil then
+				ofp3.nx := fp2;
+			else
+				flp := fp2;
+			end if;
+			ret := ptr;
+			return;
+		end if;
+
+		#  Find the largest chunk on the freelist while
+		#  walking it.
+
+		if fp3.sz > s then
+			s := fp3.sz;
+		end if;
+	ofp3 := fp3; fp3 := fp3.nx;
+	end loop;
+
+	#  Call malloc() for a new chunk, then copy over the data, and
+	#  release the old region.
+
+	memp := malloc(len);
+	if memp == nil then
+		ret := nil;
+		return;
+	end if;
+	dummy := memcpy(memp, ptr, fp1.sz); 
+	free(ptr);
+	ret := memp;
+end sub;
+
+#-------------------------------------------------------------------------
+
+sub print_total_free() is
+        print("total free bytes: ");
+	print_hex_i16(total_free());
+	print_nl();
+end sub;
+
+var handles: [uint8][32];
+var sizes: uint16[32];
+
+sub print_alloc() is
+	var i: uint8;
+	var fp: [freelist];
+	var cp: [uint8];
+
+	i := 0;
+	while i < 32 loop
+		if handles[i] != 0 as [uint8] then
+			cp := handles[i] - 2;
+			fp := cp as [freelist];
+			print("allocated block @ ");
+			print_hex_i16(&(fp.nx) as uint16);
+			print(": ");
+			print(itoa(fp.sz as int16));
+			print(" bytes\n");
+		end if;
+		i := i + 1;
+	end loop;
+end sub;
+
+var i: uint16;
+var j: uint16;
+var k: uint16;
+var l: uint16;
+var m: uint16;
+var om: uint16;
+var p: uint16;
+var f: uint16;
+var s: uint16;
+var mem: [uint8];
+var n: uint8;
+
+ArgvInit();
+
+var arg := ArgvNext();
+var real: uint8;
+
+if [arg] != 0 then
+	real := 1;
+else
+	real := 0;
+end if;
+
+print_total_free();
+print_nl();
+print("--------------------------------------------------\n");
+print("--------------------------------------------------\n");
+print("Stress test (100 iterations):\n");
+print("--------------------------------------------------\n");
+
+xrndseed();
+
+k := 0; 
+while k < 100 loop
+	n := 0;
+	while n < 32 loop
+		handles[n] := 0 as [uint8];
+		n := n + 1;
+	end loop;
+
+	n := 0;
+	while n < 32 loop
+		sizes[n] := 0;
+		n := n + 1;
+	end loop;
+
+        j := xrnd() % 16 + 15;
+        l := xrnd() % 80 + 7;
+	i := 0;
+	s := 0;
+
+        while i < j and s < 256 loop
+        	sizes[i as uint8] := xrnd() % l + 1;
+                s := s + sizes[i as uint8];
+		i := i + 1;
+        end loop;
+
+        j := i;
+	m := 1;
+	om := 1;
+	p := 1;
+	f := 0;
+
+        while m < 1000 loop
+		i := 0;
+		s := 0;
+
+                while i < j loop
+                	if handles[i as uint8] != 0 then
+                        	s := s + 1;
+			end if;
+		i := i + 1;
+		end loop;
+
+                if s == j then
+			break;
+		end if;
+
+                if m / om > 10 then
+			p := p << 1;
+                        p := p | 1;
+                end if;
+
+		i := 0;
+                while i < j loop
+			if (xrnd() & p) != 0 then
+                        	if handles[i as uint8] == 0 then
+					handles[i as uint8] := malloc(sizes[i as uint8]);
+					if handles[i as uint8] == 0 then
+                                               	f := f + 1;
+					end if;
+				end if;
+                        end if;
+
+			i := i + 1;
+		end loop;
+
+                i := 0; 
+		while i < j loop
+			if (xrnd() & 1) != 0 and handles[i as uint8] != 0 as [uint8] then
+				if real == 1 then
+					var newsize: uint16 := xrnd() % 0x100;
+					handles[i as uint8] := realloc(handles[i as uint8], newsize);
+					sizes[i as uint8] := newsize;
+					if handles[i as uint8] == 0 then
+                                               	f := f + 1;
+					end if;
+				end if;
+                        	free(handles[i as uint8]);
+                                handles[i as uint8] := 0;
+                        end if;
+			i := i + 1;
+		end loop;
+
+		m := m + 1;
+	end loop;
+
+	print("Iteration nr.");
+	print(itoa(k as int16 + 1));
+	print_nl();
+
+        if f != 0 then
+		print(itoa(f as int16));
+                print(" malloc failures.\n");
+	else
+		print("No malloc failures.\n");
+	end if;
+
+	print("After alloc:\n");
+	print_alloc();
+	print("Free all buffers...\n");
+
+	i := 0;
+	while i < j loop
+		free(handles[i as uint8]);
+                i := i + 1;
+	end loop;
+
+	print_nl();
+ 	k := k + 1;
+end loop;
+print("--------------------------------------------------\n");
+exit();
