@@ -527,3 +527,11 @@ Updated files:
  
  /128_512_KB : cowfe128.hex, cowfe512.hex, cowfeall.hex, cowfewbw.hex
 
+(updated on 5 November, 2025)
+
+Updated files:
+  /EXE : cowgol.hex, cowfe1.hex, cowfe2.hex
+  Cowgol language manual
+  Cowgol compiler manual
+
+  
