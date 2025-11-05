@@ -532,7 +532,8 @@ Updated files:
 Updated files:
   /EXE : cowgol.hex, cowfe1.hex, cowfe2.hex
   
-  Cowgol language manual
-  Cowgol compiler manual
+  	Cowgol language manual
+  
+  	Cowgol compiler manual
 
   
