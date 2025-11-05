@@ -1,0 +1,214 @@
+record EmitterStream is
+	subid: uint16;
+end record;
+
+var outfcb: FCB;
+	
+sub E_b8(byte: uint8) is
+	FCBPutChar(&outfcb, byte);
+end sub;
+
+sub E_b16(word: uint16) is
+	E_b8(word as uint8);
+	E_b8((word>>8) as uint8);
+end sub;
+
+sub E_b32(quad: uint32) is
+	E_b16(quad as uint16);
+	E_b16((quad>>16) as uint16);
+end sub;
+
+sub E_bsize(size: Size) is
+	E_b16(size as uint16);
+end sub;
+
+sub E_space() is
+	E_b8(' ');
+end sub;
+
+sub E_comma() is
+	E_b8(',');
+end sub;
+
+sub E_tab() is
+	E_b8('\t');
+end sub;
+
+sub E_nl() is
+	E_b8('\n');
+end sub;
+
+sub E_openp() is
+	E_b8('(');
+end sub;
+
+sub E_closep() is
+	E_b8(')');
+end sub;
+
+sub E(text: string) is
+	loop
+		var c := [text];
+		text := text + 1;
+		if c == 0 then
+			break;
+		end if;
+		E_b8(c);
+	end loop;
+end sub;
+
+sub E_countedstring(text: string) is
+	E_b8(StrLen(text) as uint8);
+	E(text);
+end sub;
+
+sub E_u32(value: uint32) is
+	var buffer: uint8[12];
+	var p := &buffer[0];
+	var pe := UIToA(value, 10, p);
+
+	loop
+		var c := [p];
+		if c == 0 then
+			break;
+		end if;
+		E_b8(c);
+		p := @next p;
+	end loop;
+end sub;
+
+sub E_u16(value: uint16) is
+	E_u32(value as uint32);
+end sub;
+
+sub E_u8(value: uint8) is
+	E_u32(value as uint32);
+end sub;
+
+sub E_i8(value: int8) is
+	if value < 0 then
+		E_b8('-');
+		value := -value;
+	else
+		E_b8('+');
+	end if;
+	E_u8(value as uint8);
+end sub;
+
+sub E_i16(value: int16) is
+	if value < 0 then
+		E_b8('-');
+		value := -value;
+	else
+		E_b8('+');
+	end if;
+	E_u16(value as uint16);
+end sub;
+
+sub E_i32(value: int32) is
+	if value < 0 then
+		E_b8('-');
+		value := -value;
+	else
+		E_b8('+');
+	end if;
+	E_u32(value as uint32);
+end sub;
+
+sub E_h(value: uint32, width: uint8) is
+	var buffer: uint8[5];
+	var pe := UIToA(value as uint32, 16, &buffer[0]);
+	var padding := width - (pe - &buffer[0]) as uint8;
+	while padding != 0 loop
+		E_b8('0');
+		padding := padding - 1;
+	end loop;
+	E(&buffer[0]);
+end sub;
+
+sub E_h8(value: uint8) is
+	E_h(value as uint32, 2);
+end sub;
+
+sub E_h16(value: uint16) is
+	E_h(value as uint32, 4);
+end sub;
+
+sub E_h32(value: uint32) is
+	E_h(value as uint32, 8);
+end sub;
+
+sub EmitterOpenfile(filename: string) is
+	if FCBOpenOut(&outfcb, filename) != 0 then
+		SimpleError(4); #("cannot open output file");
+	end if;
+end sub;
+
+sub EmitterClosefile() is
+	E_b8('E');
+	if FCBClose(&outfcb) != 0 then
+		SimpleError(5); #("cannot close output file");
+	end if;
+end sub;
+
+sub EmitterDeclareSubroutine(subr: [Subroutine]) is
+	E_b8('N');
+	E_b16(subr.id);
+	E_countedstring(subr.symbol.name);
+end sub;
+
+sub EmitterDeclareExternalSubroutine(id: uint16, external: string) is
+	E_b8('X');
+	E_b16(id);
+	E_countedstring(external);
+end sub;
+
+sub EmitterReferenceSubroutineById(user: uint16, used: uint16) is
+	E_b8('R');
+	E_b16(user);
+	E_b16(used);
+end sub;
+
+sub EmitterReferenceSubroutine(user: [Subroutine], used: [Subroutine]) is
+	EmitterReferenceSubroutineById(user.id, used.id);
+end sub;
+
+sub EmitterDeclareWorkspace(subr: [Subroutine], wid: uint8, workspace: Size) is
+	E_b8('W');
+	E_b16(subr.id);
+	E_b8(wid);
+	E_bsize(workspace);
+end sub;
+
+sub EmitParameterList(param: [Symbol]) is
+	while param != nil loop
+		E_b16(param.vardata.subr.id);
+		E_b8(param.vardata.wsid);
+		E_bsize(param.vardata.offset);
+		E_countedstring(param.name);
+		E_b8(param.vardata.type.width as uint8);
+
+		param := param.vardata.next_parameter;
+	end loop;
+end sub;
+
+sub EmitterEmitInputParameters(subr: [Subroutine]) is
+	E_b8('I');
+	E_b16(subr.id);
+	E_b8(subr.num_input_parameters);
+	EmitParameterList(GetInputParameter(subr, 0));
+end sub;
+
+sub EmitterEmitOutputParameters(subr: [Subroutine]) is
+	E_b8('O');
+	E_b16(subr.id);
+	E_b8(subr.num_output_parameters);
+	EmitParameterList(GetOutputParameter(subr, 0));
+end sub;
+
+sub EmitterEmitSubroutineFlags(subr: [Subroutine]) is
+	E_b8('F');
+	E_b16(subr.id);
+	E_b8(subr.flags);
+end sub;
+

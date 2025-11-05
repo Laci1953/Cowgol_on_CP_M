@@ -1,0 +1,280 @@
+var LOMEM: [uint8];
+@asm "global __Hbss";
+@asm "ld hl, __Hbss";	#top of the executable data space
+@asm "ld (", LOMEM, "), hl";
+
+var HIMEM: [uint8];
+@asm "ld hl, (6)";	#base of CP/M BDOS
+@asm "ld (", HIMEM, "), hl";
+
+sub AlignUp(in: intptr): (out: intptr) is
+	out := in;
+end sub;
+
+sub ExitWithError() is
+	@asm "rst 0";
+end sub;
+
+sub print_char(c: uint8) is
+	if c == 10 then
+		@asm "ld e, 13";
+		@asm "ld c, 2";
+		@asm "call 5";
+	end if;
+	@asm "ld a, (", c, ")";
+	@asm "ld e, a";
+	@asm "ld c, 2";
+	@asm "call 5";
+end sub;
+
+sub MemSet(buf: [uint8], ch: uint8, len: uint16) is
+# A=ch, HL=buf
+@asm "ld de,(", len, ")"; # DE=len
+			# HL=buf,DE=len, A=ch
+@asm "ld c,a";		# C=byte
+@asm "loopm:ld a,e";
+@asm "or d";
+@asm "ret z";		# return if len=0
+@asm "ld (hl),c";
+@asm "inc hl";
+@asm "dec de";
+@asm "jr loopm";
+end sub;
+
+sub MemCopy(src: [uint8], len: uint16, dest: [uint8]) is
+# HL=src
+@asm "ld de,(", dest, ")"; # DE=dest
+@asm "ld bc,(", len, ")"; # BC=len
+			# HL=src, DE=dest, BC=len
+@asm "ld a,b";
+@asm "or c";
+@asm "ret z";		# return if size = 0
+@asm "ldir";		# (HL) ---> (DE) BC bytes
+@asm "ret";
+end sub;
+
+sub print(ptr: [uint8]) is
+var ch: uint8;
+@asm "ld hl,(", ptr, ")";
+@asm "1:";
+@asm "ld a,(hl)";
+@asm "or a";
+@asm "ret z";
+@asm "ld (", ch, "), a";
+@asm "push hl";
+print_char(ch);
+@asm "pop hl";
+@asm "inc hl";
+@asm "jr 1b";
+end sub;
+
+sub print_nl() is
+print_char('\n');
+end sub;
+
+var buf12:uint8[12];
+
+sub Bn2Dec() is
+@asm "ld (bufptr),hl";
+@asm "ld (buffer),hl";
+@asm "ex de,hl";
+@asm "xor a";
+@asm "ld (curlen),a";
+@asm "cnvert:";
+@asm "ld e,0";
+@asm "ld b,16";
+@asm "or a";
+@asm "dvloop:";
+@asm "rl l";
+@asm "rl h";
+@asm "rl e";
+@asm "ld a,e";
+@asm "sub 10";
+@asm "ccf";
+@asm "jr nc,deccnt";
+@asm "ld e,a";
+@asm "deccnt:";
+@asm "djnz dvloop";
+@asm "rl l";
+@asm "rl h";
+@asm "chins:";
+@asm "ld a,e";
+@asm "add a,30h";
+@asm "call insert";
+@asm "ld a,h";
+@asm "or l";
+@asm "jr nz,cnvert";
+@asm "ld hl,(buffer)";
+@asm "ld c,(hl)";
+@asm "ld b,0";
+@asm "ld d,h";
+@asm "ld e,l";
+@asm "inc hl";
+@asm "ldir";
+@asm "xor a";
+@asm "ld (de),a";
+@asm "ret";
+@asm "insert:";
+@asm "push hl";
+@asm "push af";
+@asm "ld hl,(bufptr)";
+@asm "ld d,h";
+@asm "ld e,l";
+@asm "inc de";
+@asm "ld (bufptr),de";
+@asm "ld a,(curlen)";
+@asm "or a";
+@asm "jr z,exitmr";
+@asm "ld c,a";
+@asm "ld b,0";
+@asm "lddr";
+@asm "exitmr:";
+@asm "ld a,(curlen)";
+@asm "inc a";
+@asm "ld (curlen),a";
+@asm "ld (hl),a";
+@asm "ex de,hl";
+@asm "pop af";
+@asm "ld (hl),a";
+@asm "pop hl";
+@asm "ret";
+@asm "buffer: defs 2";
+@asm "bufptr: defs 2";
+@asm "curlen: defs 1";
+end sub;
+
+sub print_i8(v: uint8) is
+@asm "ld hl,", buf12 ;
+@asm "ld a,(", v, ")";
+@asm "ld e,a";
+@asm "ld d,0";
+Bn2Dec();
+print(&buf12[0]);
+@asm "ret";
+end sub;
+
+sub print_i16(v: uint16) is
+@asm "ld hl,", buf12 ;
+@asm "ld de,(", v, ")";
+Bn2Dec();
+print(&buf12[0]);
+@asm "ret";
+end sub;
+
+sub print_hex_i8(char: uint8) is
+var ra: uint8;
+@asm "call Bin2Hex";
+@asm "push bc";
+@asm "ld (", ra, "),a";
+print_char(ra);
+@asm "pop bc";
+@asm "ld a,c";
+@asm "ld (", ra, "),a";
+print_char(ra);
+@asm "ret";
+@asm "Bin2Hex:";
+@asm "ld c,a";
+@asm "and 0FH";
+@asm "call nibble2hex";
+@asm "ld a,c";
+@asm "ld c,b";
+@asm "and 0F0H";
+@asm "rrca";
+@asm "rrca";
+@asm "rrca";
+@asm "rrca";
+@asm "nibble2hex:";
+@asm "add a,090h";
+@asm "daa";
+@asm "adc a,040h";
+@asm "daa";
+@asm "ld b,a";
+@asm "ret";
+end sub;
+
+sub print_hex_i16(word: uint16) is
+var ra: uint8;
+@asm "ld a,(", word, "+1)";
+@asm "ld (", ra, "),a";
+print_hex_i8(ra);
+@asm "ld a,(", word, ")";
+@asm "ld (", ra, "),a";
+print_hex_i8(ra);
+end sub;
+
+sub print_hex_i32(dword: uint32) is
+var v16: uint16;
+@asm "ld hl,(", dword, "+2)";
+@asm "ld (", v16, "),hl";
+print_hex_i16(v16);
+@asm "ld hl,(", dword, ")";
+@asm "ld (", v16, "),hl";
+print_hex_i16(v16);
+end sub;
+
+sub UIToA(value: uint32, base: uint8, buffer: [uint8]): (ptr: [uint8]) is
+	ptr := buffer;
+	loop
+		var rem := value % (base as uint32);
+		value := value / (base as uint32);
+		if rem < 10 then
+			rem := rem + '0';
+		else
+			rem := rem + ('a' - 10);
+		end if;
+		[ptr] := rem as uint8;
+		ptr := @next ptr;
+
+		if value == 0 then
+			break;
+		end if;
+	end loop;
+
+	var s1 := buffer;
+	var s2 := @prev ptr;
+	while s2 > s1 loop
+		var c := [s1];
+		[s1] := [s2];
+		[s2] := c;
+		s1 := @next s1;
+		s2 := @prev s2;
+	end loop;
+
+	[ptr] := 0;
+end sub;
+
+# returns 0 if equal, 1 if greather, else -1
+sub StrCmp(str1: [uint8], str2: [uint8]): (ret: int8) is
+@asm "ld de,(", str1, ")";
+@asm "ld hl,(", str2, ")";
+@asm "1:";
+@asm "ld a,(de)";
+@asm "cp (hl)";
+@asm "jr nz,2f";
+@asm "or a";
+@asm "ret z";
+@asm "jr 3f";
+@asm "2:";
+@asm "jr nc,4f";
+@asm "ld a,-1";
+@asm "ret";
+@asm "3:";
+@asm "inc hl";
+@asm "inc de";
+@asm "jr 1b";
+@asm "4:";
+@asm "ld a,1";
+@asm "ret";
+end sub;
+
+sub StrLen(str: [uint8]): (len: uint16) is
+@asm "ld de,(", str, ")";
+@asm "ld hl,0";
+@asm "1:";
+@asm "ld a,(de)";
+@asm "or a";
+@asm "ret z";
+@asm "inc de";
+@asm "inc hl";
+@asm "jr 1b";
+end sub;

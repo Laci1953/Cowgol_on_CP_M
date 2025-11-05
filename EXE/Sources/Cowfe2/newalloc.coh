@@ -1,0 +1,198 @@
+# Memory allocation subroutines
+#
+#       Algorithm Copyright 
+#
+# (c) 2002, 2004, 2010 Joerg Wunsch, 
+# (c) 2010  Gerben van den Broeke
+#
+# ported to Cowgol by Ladislau Szilagyi, March 2024
+#
+
+record freelist is
+	sz: intptr;	#size of memory chunk
+	nx: [freelist]; #pointer to next free memory chunk
+end record;
+
+# free memory chunks header
+var flp: [freelist] := LOMEM as [freelist];	#list of available (free) chunks of memory
+flp.nx := nil;					#initially, we have a single memory chunk
+flp.sz := (HIMEM - LOMEM - 2) as intptr;	#fit in all the available memory
+
+#
+# returns the total size of the available (free) memory (in bytes)
+#
+sub GetFreeMemory(): (ret: uint16) is
+	var fp1:[freelist] := flp;
+	ret := 0;
+	while fp1 != nil loop
+		ret := ret + fp1.sz as uint16;
+		fp1 := fp1.nx;
+	end loop;
+end sub;
+
+#
+# allocate "size" bytes
+# returns 0 if memory full
+#
+sub RawAlloc(size: intptr): (ret: [uint8]) is
+	var fp1: [freelist];
+	var fp2: [freelist];
+	var sfp1: [freelist];
+	var sfp2: [freelist];
+	var cp: [uint8];
+	var s: uint16;
+
+	#  Our minimum chunk size is the size of a pointer (plus the
+	#  size of the "sz" field, but we don't need to account for
+	#  this), otherwise we could not possibly fit a freelist entry
+	#  into the chunk later.
+
+	if size < 2 then
+		size := 2;
+	end if;
+
+	#  First, walk the free list and try finding a chunk that
+	#  would match exactly.  If we found one, we are done.  While
+	#  walking, note down the smallest chunk we found that would
+	#  still fit the request -- we need it for step 2.
+
+	s := 0; fp1 := flp; fp2 := nil;
+
+	while fp1 != nil loop
+
+		if fp1.sz < size then
+			fp2 := fp1; fp1 := fp1.nx;
+			continue;
+		end if;
+
+		if fp1.sz == size then
+
+			#  Found it.  Disconnect the chunk from the
+			#  freelist, and return it.
+
+			if fp2 != nil then
+				fp2.nx := fp1.nx;
+			else
+				flp := fp1.nx;
+			end if;
+
+			ret := fp1 as [uint8] + 2; #skip sz
+			MemSet(ret, 0, size);
+			return;
+		else
+			if s == 0 or fp1.sz < s then
+				s := fp1.sz;
+				sfp1 := fp1;
+				sfp2 := fp2;
+			end if;
+		end if;
+
+		fp2 := fp1; fp1 := fp1.nx; 
+	end loop;
+
+	#  Step 2: If we found a chunk on the freelist that would fit
+	#  (but was too large), look it up again and use it, since it
+	#  is our closest match now.  Since the freelist entry needs
+	#  to be split into two entries then, watch out that the
+	#  difference between the requested size and the size of the
+	#  chunk found is large enough for another freelist entry; if
+	#  not, just enlarge the request size to what we have found,
+	#  and use the entire chunk.
+
+	if s != 0 then
+		if s - size < 4 then
+
+			if sfp2 != nil then
+				sfp2.nx := sfp1.nx;
+			else
+				flp := sfp1.nx;
+			end if;
+
+			ret := sfp1 as [uint8] + 2; #skip sz
+			MemSet(ret, 0, size);
+			return;
+		end if;
+
+		#  Split them up.  Note that we leave the first part
+		#  as the new (smaller) freelist entry, and return the
+		#  upper portion to the caller.  This saves us the
+		#  work to fix up the freelist chain; we just need to
+		#  fixup the size of the current entry, and note down
+		#  the size of the new chunk before returning it to
+		#  the caller.
+
+		cp := sfp1 as [uint8];
+		s := s - size;
+		cp := cp + s;
+		sfp2 := cp as [freelist];
+		sfp2.sz := size;
+		sfp1.sz := s - 2;
+		ret := sfp2 as [uint8] + 2; #skip sz
+		MemSet(ret, 0, size);
+		return;
+	end if;
+
+	#  Step 4: There's no help, just fail. :-/
+
+	ret := nil;
+end sub;
+
+#
+# free the (previously allocated) buffer
+# !!! using as argument a NOT allocated pointer will crash the system !!!
+#
+sub Free(p: [uint8]) is
+	var fp1: [freelist];
+	var fp2: [freelist];
+	var fpnew: [freelist];
+	var cp1: [uint8];
+	var cp2: [uint8];
+	var cpnew: [uint8];
+
+	#  free(NULL) must be a no-op  
+
+	if p == nil then
+		return;
+	end if;
+
+	cpnew := p - 2;
+	fpnew := cpnew as [freelist];
+	fpnew.nx := nil;
+
+	#  Now, find the position where our new entry belongs onto the
+	#  freelist.  Try to aggregate the chunk with adjacent chunks
+	#  if possible.
+
+	fp1 := flp; fp2 := nil;
+
+	while fp1 != nil loop
+	     	if fp1 < fpnew then
+			fp2 := fp1; fp1 := fp1.nx;
+			continue;
+		end if;
+		cp1 := fp1 as [uint8];
+		fpnew.nx := fp1;
+		if fpnew as [uint8] + 2 + fpnew.sz == cp1 then
+			fpnew.sz := fpnew.sz + fp1.sz + 2;
+			fpnew.nx := fp1.nx;
+		end if;
+		if fp2 == nil then
+			flp := fpnew;
+			return;
+		end if;
+		break;
+	end loop;
+
+	#  Note that we get here either if we hit the "break" above,
+	#  or if we fell off the end of the loop.  The latter means
+	#  we've got a new topmost chunk.  Either way, try aggregating
+	#  with the lower chunk if possible.
+
+	fp2.nx := fpnew;
+	cp2 := fp2 as [uint8] + 2; #skip sz
+
+	if cp2 + fp2.sz == cpnew then
+		fp2.sz := fp2.sz + fpnew.sz + 2;
+		fp2.nx := fpnew.nx;
+	end if;
+end sub;

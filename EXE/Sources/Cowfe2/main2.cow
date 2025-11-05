@@ -1,0 +1,192 @@
+include "routines.coh";
+include "argv.coh";
+include "newalloc.coh";
+include "file.coh";
+
+typedef string is [uint8];
+
+var outputfile: string := (0 as string);
+var tmpfcb: FCB;
+var token: uint8;
+const TOKEN_BUFFER_SIZE := 128;
+var token_buffer: uint8[TOKEN_BUFFER_SIZE];
+
+typedef RegId is uint8; # FIXME
+typedef Word is uint8;
+typedef NodeBitmap is uint8;
+const REGISTER_COUNT := 0;
+const INSTRUCTION_TEMPLATE_DEPTH := 0;
+
+var filename: uint8[13];
+filename[0] := 0;
+
+var lineno: uint16;
+
+sub StartError() is
+	print("error: ");
+	if filename[0] != 0 then
+		print(&filename[0]);
+		print(": ");
+		print_i16(lineno);
+		print(": ");
+	end if;
+end sub;
+
+sub EndError() is
+	print_nl();
+	ExitWithError();
+end sub;
+
+sub SimpleError(message: uint8) is
+	StartError();
+	print_i8(message);
+	EndError();
+end sub;
+
+include "coodecls.coh";
+include "types.coh";
+include "allocat2.coh";
+include "parserto.coh";
+include "midcode2.coh";
+include "emitter2.coh";
+include "namespa2.coh";
+include "codegen.coh";
+include "symbols.coh";
+include "express2.coh";
+include "treewal2.coh";
+include "parser2.coh";
+
+sub PrintFreeMemory() is
+	print_i16((GetFreeMemory() >> 10) as uint16);
+	print("kB free\n");
+end sub;
+
+sub SyntaxError() is
+	print("syntax error: cowfe2 <outfile>\n");
+	ExitWithError();
+end sub;
+
+sub ParseArguments() is
+	ArgvInit();
+
+	outputfile := ArgvNext();
+
+	if outputfile == (0 as string) then
+		SyntaxError();
+	end if;
+end sub;
+
+const FILENAME := 100;
+const LINENO := 101;
+const NEWLINE := 102;
+
+sub I_b8(): (byte: uint8) is
+	byte := FCBGetChar(&tmpfcb);
+end sub;
+
+sub I_b16(): (word: uint16) is
+	word := I_b8() as uint16 + (I_b8() as uint16 << 8);
+end sub;
+
+sub I_b32(): (quad: uint32) is
+	quad := I_b16() as uint32 + (I_b16() as uint32 << 16);
+end sub;
+
+sub I_string(p: [uint8]) is
+	loop
+		[p] := FCBGetChar(&tmpfcb);
+		if [p] == 0 then
+			break;
+		end if;
+		p := @next p;
+	end loop;
+end sub;
+
+print("COWFE phase 2:\n");
+PrintFreeMemory();
+
+ParseArguments();
+
+if FCBOpenIn(&tmpfcb, "COWFE.$$$") != 0 then
+	print("Cannot open temporary file for input!\n");
+	ExitWithError();
+end if;
+
+CreateMainSubroutine();
+ArchInitTypes();
+EmitterOpenfile(outputfile);
+EmitterDeclareSubroutine(current_subr);
+Generate(MidStartfile());
+Generate(MidStartsub(current_subr));
+
+ParserInit();
+
+loop
+	var yymajor := I_b8();
+	var yyminor: YYMINORTYPE;
+
+	#print("\nyymajor=");
+	#print_hex_i8(yymajor);
+
+	case yymajor is
+		when NUMBER:
+			yyminor.yy0.number := I_b32() as int32;
+			#print(" NUMBER=");
+			#print_hex_i32(yyminor.yy0.number as uint32);
+
+		when ID:
+			I_string(&token_buffer[0]);
+			yyminor.yy0.string := InternalStrDup(&token_buffer[0]);
+			#print(" ID=");
+			#print(&token_buffer[0]);
+
+		when STRING:
+			I_string(&token_buffer[0]);
+			yyminor.yy0.string := InternalStrDup(&token_buffer[0]);
+			#print(" STRING=");
+			#print(&token_buffer[0]);
+
+		when FILENAME:
+			I_string(&filename[0]);
+			#print(" FILENAME=");
+			#print(&filename[0]);
+			#print_nl();
+
+		when LINENO:
+			lineno := I_b16();
+			#print(" LINENO=");
+			#print_i16(lineno);
+			#print_nl();
+
+		when NEWLINE:
+			lineno := lineno + 1;
+			#print(" NEWLINE, lineno=");
+			#print_i16(lineno);
+			#print_nl();
+
+		when else:
+			yyminor.yy0.number := 0;
+	end case;
+
+	if yymajor != FILENAME and yymajor != LINENO and yymajor != NEWLINE then
+		ParserFeedToken(yymajor, &yyminor);
+	end if;
+
+	if yymajor == 0 then
+		break;
+	end if;
+end loop;
+
+var dummy: uint8 := FCBClose(&tmpfcb);
+
+ParserDeinit();
+
+Generate(MidEndsub(current_subr));
+ReportWorkspaces(current_subr);
+Generate(MidEndfile());
+EmitterClosefile();
+
+print("done!\n");
+PrintFreeMemory();
+@asm "ld hl,0";
+@asm "ld (80h),hl";

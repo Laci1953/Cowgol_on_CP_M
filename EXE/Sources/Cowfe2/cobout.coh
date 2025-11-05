@@ -1,0 +1,254 @@
+# subr:[Subroutine]:sym:[Symbol]:remaining:uint8
+sub WriteMid1 implements MidWriter is
+	E_b16(node.arg.subr.id);
+	E_b16(node.arg.sym.vardata.subr.id);
+	E_b8(node.arg.sym.vardata.wsid);
+	E_bsize(node.arg.sym.vardata.offset);
+	E_b8(node.arg.sym.vardata.type.width as uint8);
+	E_b8(node.arg.remaining);
+end sub;
+# sext:uint8
+sub WriteMid2 implements MidWriter is
+	E_b8(node.cast8.sext);
+end sub;
+# truelabel:LabelRef:falselabel:LabelRef:fallthrough:LabelRef:negated:uint8
+sub WriteMid3 implements MidWriter is
+	E_b16(node.beq.truelabel);
+	E_b16(node.beq.falselabel);
+	E_b16(node.beq.fallthrough);
+	E_b8(node.beq.negated);
+end sub;
+# sym:[Symbol]
+sub WriteMid4 implements MidWriter is
+	E_b16(node.asmsymbol.sym.vardata.subr.id);
+	E_b8(node.asmsymbol.sym.vardata.wsid);
+	E_bsize(node.asmsymbol.sym.vardata.offset);
+	E_b8(node.asmsymbol.sym.vardata.type.width as uint8);
+end sub;
+# label:uint16
+sub WriteMid5 implements MidWriter is
+	E_b16(node.label.label);
+end sub;
+# sym:[Symbol]:off:Size
+sub WriteMid6 implements MidWriter is
+	E_b16(node.address.sym.vardata.subr.id);
+	E_b8(node.address.sym.vardata.wsid);
+	E_bsize(node.address.sym.vardata.offset);
+	E_b8(node.address.sym.vardata.type.width as uint8);
+	E_bsize(node.address.off);
+end sub;
+# value:int32:falselabel:uint16
+sub WriteMid7 implements MidWriter is
+	E_b32(node.whencase.value as uint32);
+	E_b16(node.whencase.falselabel);
+end sub;
+# text:string
+sub WriteMid8 implements MidWriter is
+	E_countedstring(node.asmtext.text);
+end sub;
+# value:int32
+sub WriteMid9 implements MidWriter is
+	E_b32(node.constant.value as uint32);
+end sub;
+# 
+sub WriteMid10 implements MidWriter is
+end sub;
+# subr:[Subroutine]
+sub WriteMid11 implements MidWriter is
+	E_b16(node.asmsubref.subr.id);
+end sub;
+var writers: MidWriter[] := {
+	WriteMid1,
+	WriteMid2,
+	WriteMid3,
+	WriteMid4,
+	WriteMid5,
+	WriteMid6,
+	WriteMid7,
+	WriteMid8,
+	WriteMid9,
+	WriteMid10,
+	WriteMid11,
+};
+var signatures: uint8[] := {
+	9, # END
+	9, # STARTFILE
+	9, # ENDFILE
+	10, # STARTSUB
+	10, # ENDSUB
+	3, # STARTINIT
+	8, # INIT0
+	8, # INIT1
+	8, # INIT2
+	8, # INIT4
+	8, # INIT8
+	7, # INITSTRING
+	5, # INITADDRESS
+	10, # INITSUBREF
+	9, # ENDINIT
+	9, # ASMGROUPSTART
+	9, # ASMGROUPEND
+	9, # ASMSTART
+	7, # ASMTEXT
+	3, # ASMSYMBOL
+	10, # ASMSUBREF
+	8, # ASMVALUE
+	9, # ASMEND
+	9, # FALLBACK
+	9, # PAIR
+	4, # LABEL
+	4, # JUMP
+	9, # RETURN
+	10, # CALL
+	0, # ARG0
+	0, # ARG1
+	0, # ARG2
+	0, # ARG4
+	0, # ARG8
+	0, # POPARG0
+	0, # POPARG1
+	0, # POPARG2
+	0, # POPARG4
+	0, # POPARG8
+	8, # CONSTANT
+	7, # STRING
+	5, # ADDRESS
+	10, # SUBREF
+	9, # DEREF0
+	9, # DEREF1
+	9, # DEREF2
+	9, # DEREF4
+	9, # DEREF8
+	9, # STORE0
+	9, # STORE1
+	9, # STORE2
+	9, # STORE4
+	9, # STORE8
+	2, # BAND
+	2, # BOR
+	2, # BEQ0
+	2, # BEQ1
+	2, # BEQ2
+	2, # BEQ4
+	2, # BEQ8
+	2, # BLTS0
+	2, # BLTS1
+	2, # BLTS2
+	2, # BLTS4
+	2, # BLTS8
+	2, # BLTU0
+	2, # BLTU1
+	2, # BLTU2
+	2, # BLTU4
+	2, # BLTU8
+	9, # STARTCASE0
+	9, # STARTCASE1
+	9, # STARTCASE2
+	9, # STARTCASE4
+	9, # STARTCASE8
+	6, # WHENCASE0
+	6, # WHENCASE1
+	6, # WHENCASE2
+	6, # WHENCASE4
+	6, # WHENCASE8
+	9, # ENDCASE0
+	9, # ENDCASE1
+	9, # ENDCASE2
+	9, # ENDCASE4
+	9, # ENDCASE8
+	1, # CAST10
+	1, # CAST11
+	1, # CAST12
+	1, # CAST14
+	1, # CAST18
+	1, # CAST20
+	1, # CAST21
+	1, # CAST22
+	1, # CAST24
+	1, # CAST28
+	1, # CAST40
+	1, # CAST41
+	1, # CAST42
+	1, # CAST44
+	1, # CAST48
+	1, # CAST80
+	1, # CAST81
+	1, # CAST82
+	1, # CAST84
+	1, # CAST88
+	9, # NOT0
+	9, # NOT1
+	9, # NOT2
+	9, # NOT4
+	9, # NOT8
+	9, # NEG0
+	9, # NEG1
+	9, # NEG2
+	9, # NEG4
+	9, # NEG8
+	9, # LSHIFT0
+	9, # LSHIFT1
+	9, # LSHIFT2
+	9, # LSHIFT4
+	9, # LSHIFT8
+	9, # RSHIFTU0
+	9, # RSHIFTU1
+	9, # RSHIFTU2
+	9, # RSHIFTU4
+	9, # RSHIFTU8
+	9, # RSHIFTS0
+	9, # RSHIFTS1
+	9, # RSHIFTS2
+	9, # RSHIFTS4
+	9, # RSHIFTS8
+	9, # SUB0
+	9, # SUB1
+	9, # SUB2
+	9, # SUB4
+	9, # SUB8
+	9, # DIVU0
+	9, # DIVU1
+	9, # DIVU2
+	9, # DIVU4
+	9, # DIVU8
+	9, # DIVS0
+	9, # DIVS1
+	9, # DIVS2
+	9, # DIVS4
+	9, # DIVS8
+	9, # REMU0
+	9, # REMU1
+	9, # REMU2
+	9, # REMU4
+	9, # REMU8
+	9, # REMS0
+	9, # REMS1
+	9, # REMS2
+	9, # REMS4
+	9, # REMS8
+	9, # ADD0
+	9, # ADD1
+	9, # ADD2
+	9, # ADD4
+	9, # ADD8
+	9, # MUL0
+	9, # MUL1
+	9, # MUL2
+	9, # MUL4
+	9, # MUL8
+	9, # AND0
+	9, # AND1
+	9, # AND2
+	9, # AND4
+	9, # AND8
+	9, # OR0
+	9, # OR1
+	9, # OR2
+	9, # OR4
+	9, # OR8
+	9, # EOR0
+	9, # EOR1
+	9, # EOR2
+	9, # EOR4
+	9, # EOR8
+};
