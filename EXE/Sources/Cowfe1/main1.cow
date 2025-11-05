@@ -1,0 +1,128 @@
+include "cowgol.coh";
+include "argv.coh";
+include "strings.coh";
+include "malloc.coh";
+include "file.coh";
+include "parserto.coh";
+
+typedef string is [uint8];
+typedef Word is uint8;
+
+include "types.coh";
+
+sub InternalAlloc(length: intptr): (block: [uint8]) is
+	block := RawAlloc(length);
+	if block == nil then
+		print("Out of memory\n");
+		ExitWithError();
+	end if;
+end sub;
+
+sub InternalStrDup(s: string): (news: string) is
+	var len := StrLen(s) + 1;
+	news := InternalAlloc(len);
+	MemCopy(s, len, news);
+end sub;
+
+var tmpfcb: FCB;
+
+sub O_b8(byte: uint8) is
+	FCBPutChar(&tmpfcb, byte);
+end sub;
+
+sub O_b16(word: uint16) is
+	O_b8(word as uint8);
+	O_b8((word>>8) as uint8);
+end sub;
+
+sub O_b32(quad: uint32) is
+	O_b16(quad as uint16);
+	O_b16((quad>>16) as uint16);
+end sub;
+
+sub O_string(p: [uint8]) is
+	loop
+		FCBPutChar(&tmpfcb, [p]);
+		if [p] == 0 then
+			break;
+		end if;
+		p := @next p;
+	end loop;
+end sub;
+
+include "lexer1.coh";
+
+var inputfile: string := (0 as string);
+var token: uint8;
+
+sub SyntaxError() is
+	print("syntax error: cowfe1 [-Ipath] <infile>\n");
+	ExitWithError();
+end sub;
+
+sub ParseArguments() is
+	ArgvInit();
+
+	loop
+		var arg := ArgvNext();
+		if arg == (0 as string) then
+			break;
+		end if;
+
+		if [arg] == '-' then
+			arg := arg + 1;
+			if [arg] == 'I' then
+				arg := arg + 1;
+				LexerAddIncludePath(arg);
+			else
+				SyntaxError();
+			end if;
+		else
+			if inputfile == (0 as string) then
+				inputfile := arg;
+			else
+				SyntaxError();
+			end if;
+		end if;
+	end loop;
+
+	if inputfile == (0 as string) then
+		SyntaxError();
+	end if;
+end sub;
+
+print("COWFE phase 1:\n");
+
+if FCBOpenOut(&tmpfcb, "COWFE.$$$") != 0 then
+	print("Cannot open temporary file for output!\n");
+	ExitWithError();
+end if;
+
+ParseArguments();
+LexerAddIncludePath("");
+LexerIncludeFile(inputfile);
+
+loop
+	token := LexerReadToken();
+	O_b8(token);
+
+	if token == NUMBER then
+		O_b32(token_value as uint32);
+	elseif token == ID or token == STRING then
+		O_string(&token_buffer[0]);
+	end if;
+
+	if token == 0 then
+		break;
+	end if;
+end loop;
+
+if FCBClose(&tmpfcb) != 0 then
+	print("Cannot close temporary file!\n");
+	ExitWithError();
+end if;
+
+print("done!\n");
+@asm "ld hl,0";
+@asm "ld (80h),hl";
+
