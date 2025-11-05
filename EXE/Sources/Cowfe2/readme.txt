@@ -1,1 +1,1 @@
-sources for cowfe2
+sources for cowfe2 (used for -B option)
