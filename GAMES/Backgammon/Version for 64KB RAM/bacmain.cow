@@ -1,0 +1,874 @@
+#***************************************************************************
+#
+#   GAMMON IV, Version 2
+#   VT100 version by Anna Christina Nass <acn@acn.wtf>
+#   HiTech C porting , Game Save/Load by Ladislau Szilagyi, 2023
+#   Cowgol porting by Ladislau Szilagyi, sept 2025
+#
+#   Author:  David C. Oshel
+#            1219 Harding Avenue
+#            Ames, Iowa 50010
+#
+#   Date:    March 26, 1986
+#
+#   Gammon IV is probably the best backgammon game currently available for
+#   CP/M.  I wrote it because I was disgusted with the price and dullness
+#   of all other programs which allegedly play backgammon on CP/M systems.
+#
+#   This program has THREE DIFFERENT PLAYING STYLES, any one of which can
+#   consistently beat a novice player, and occasionally beat a good player.
+#   In all three levels, the computer's strategy can even seem brilliant;
+#   there is nothing routine about it.
+#
+#*****************************************************************************
+
+@decl sub exit() @extern("exit");
+@decl sub print_char(c: uint8) @extern("print_char");
+@decl sub print(ptr: [uint8]) @extern("print");
+@decl sub print_i16(v: int16) @extern("print_i16");
+@decl sub itoa(i: int16): (pbuf: [uint8]) @extern("itoa");
+@decl sub xrnd() :(ret: uint16) @extern("xrnd");
+
+@decl sub play();
+@decl sub whofirst();
+@decl sub getmove();
+@decl sub taketurns();
+@decl sub tellmove();
+@decl sub yrmove();
+@decl sub nomove(): (ret: uint8) @extern("nomove");
+@decl sub getyrmove(): (ret: uint8);
+@decl sub setchat(p: [uint8]) @extern("setchat");
+@decl sub mytotal(): (ret: int16) @extern("mytotal");
+@decl sub yrtotal(): (ret: int16) @extern("yrtotal");
+@decl sub topstone(who: int16): (ret: int16) @extern("topstone");
+@decl sub cantbearoff(mypt: int16, pips: int16, tops: int16 ): (ret: uint8) @extern("cantbearoff");
+@decl sub other( color: int16 ): (ret: int16) @extern("other");
+@decl sub wipedice() @extern("wipedice");
+@decl sub draw_board() @extern("draw_board");
+@decl sub rolldice( who: int16 ) @extern("rolldice");
+@decl sub saveboard() @extern("saveboard");
+@decl sub restoreboard() @extern("restoreboard");
+@decl sub blanks( n: int16 ) @extern("blanks");
+@decl sub msg(p: [uint8]) @extern("msg");
+@decl sub debug(p: [uint8]) @extern("debug");
+@decl sub movestone( from: int16, to: int16) @extern("movestone");
+@decl sub barcube() @extern("barcube");
+@decl sub idouble() @extern("idouble");
+@decl sub cubeval(): (ret: uint8) @extern("cubeval");
+@decl sub getpt(b: uint8, h: uint8): (ret: int16) @extern("getpt");
+@decl sub set_level(v: int16) @extern("set_level");
+@decl sub get_player(): (ret: int16) @extern("get_player");
+@decl sub set_player(v: int16) @extern("set_player");
+@decl sub get_dice(i: uint8): (ret:int16) @extern("get_dice");
+@decl sub set_dice(i: uint8, v: int16) @extern("set_dice");
+@decl sub bearoff():(ret: uint8) @extern("bearoff");
+@decl sub endgame():(ret: uint8) @extern("endgame");
+@decl sub clrpend() @extern("clrpend");
+@decl sub mymove() @extern("mymove");
+@decl sub whosebar( who: int16 ): (ret: int16) @extern("whosebar");
+@decl sub whosehome( who: int16 ): (ret: int16) @extern("whosehome");
+@decl sub get_point_stones(i: uint8): (ret: int16) @extern("get_point_stones");
+@decl sub get_point_owner(i: uint8): (ret: int16) @extern("get_point_owner");
+@decl sub get_token1(): (ret: [uint8]) @extern("get_token1");
+@decl sub get_token2(): (ret: [uint8]) @extern("get_token2");
+@decl sub update() @extern("update");
+@decl sub setup() @extern("setup");
+@decl sub newboard() @extern("newboard");
+@decl sub reverse() @extern("reverse");
+@decl sub swaptokens() @extern("swaptokens");
+
+sub ConOut(ch: uint8) is
+@asm "jp __ConOut";
+end sub;
+
+sub ConIn(): (ret: uint8) @extern("ConIn") is
+@asm "jp __ConIn";
+end sub;
+
+const TRUE := 1;
+const FALSE := 0;
+const ME := 1;
+const YOU := 2;
+const YRBAR := 0;
+const MYBAR := 25;
+const YRHOME := 26;
+const MYHOME := 27;
+const ERROR := 999;   # anything well out of range 
+
+const ESC := 0x1B;
+const CR := 13;
+
+# Variables & get/set routines #####################################################
+
+var list: int16[56];  # 2 x 28 two dice, two lists 
+
+sub get_list(i: int16, j: int16): (ret: int16) @extern("get_list") is
+	ret := list[((i * 28) + j) as uint8];
+end sub;
+
+sub set_list(i: int16, j: int16, val: int16) @extern("set_list") is
+	list[((i * 28) + j) as uint8] := val;
+end sub;
+
+###
+
+var movesleft: int16;
+
+sub get_movesleft(): (ret:int16) @extern("get_movesleft") is
+	ret := movesleft;
+end sub;
+
+sub set_movesleft(val: int16) @extern("set_movesleft") is
+	movesleft := val;
+end sub;
+
+###
+
+var cantuse: int16;
+
+sub get_cantuse(): (ret: int16) @extern("get_cantuse") is
+	ret := cantuse;
+end sub;
+
+sub set_cantuse(val: int16) @extern("set_cantuse") is
+	cantuse := val;
+end sub;
+
+###
+
+var myturns: int16;
+
+sub get_myturns(): (ret:int16) @extern("get_myturns") is
+	ret := myturns;
+end sub;
+
+sub set_myturns(val: int16) @extern("set_myturns") is
+	myturns := val;
+end sub;
+
+###
+
+var firstmove: int16;
+
+sub get_firstmove(): (ret:int16) @extern("get_firstmove") is
+	ret := firstmove;
+end sub;
+
+sub set_firstmove(val: int16) @extern("set_firstmove") is
+	firstmove := val;
+end sub;
+
+###
+
+var lookforit: uint8;
+
+sub get_lookforit(): (ret:uint8) @extern("get_lookforit") is
+	ret := lookforit;
+end sub;
+
+sub set_lookforit(val: uint8) @extern("set_lookforit") is
+	lookforit := val;
+end sub;
+
+###
+
+var chatter: uint8[80];
+
+sub get_chatter(): (ret: [uint8]) @extern ("get_chatter") is
+	ret := &chatter[0];
+end sub;
+
+###
+
+record _doubles is
+	cube: int16;
+	whosecube: int16;
+end record;
+
+var doubles: _doubles;
+
+sub get_doubles_cube(): (ret: int16) @extern("get_doubles_cube") is
+	ret := doubles.cube;
+end sub;
+
+sub set_doubles_cube(v: int16) @extern("set_doubles_cube") is
+doubles.cube := v;
+end sub;
+
+sub get_doubles_whosecube(): (ret: int16) @extern("get_doubles_whosecube") is
+	ret := doubles.whosecube;
+end sub;
+
+sub set_doubles_whosecube(v: int16) @extern("set_doubles_whosecube") is
+doubles.whosecube := v;
+end sub;
+
+###
+
+var yrdice: uint8;
+
+sub get_yrdice(): (ret: uint8) @extern("get_yrdice") is
+ret := yrdice;
+end sub;
+
+sub set_yrdice(v: uint8) @extern("set_yrdice") is
+yrdice := v;
+end sub;
+
+###
+
+var deciding: int16;
+
+###
+
+var show: int16;
+
+sub get_show(): (ret:int16) @extern("get_show") is
+	ret := show;
+end sub;
+
+sub set_show(val: int16) @extern("set_show") is
+	show := val;
+end sub;
+
+###
+
+var moremsgline: int16;
+
+sub set_moremsgline(v: int16) @extern("set_moremsgline") is
+moremsgline := v;
+end sub;
+
+###
+
+var startcubevalue: int16;
+
+sub get_startcubevalue(): (ret:int16) @extern("get_startcubevalue") is
+	ret := startcubevalue;
+end sub;
+
+sub set_startcubevalue(val: int16) @extern("set_startcubevalue") is
+	startcubevalue := val;
+end sub;
+
+###
+
+var ch: uint8;
+var p1: [uint8] := "Play, Reverse, Swap, New, Quit, Load, (CR for more ...) ";
+var p2a: [uint8] := "Use ";
+var p2b: [uint8] := " dice, Opponent, Count (CR to go back...) ";
+var Imove: [uint8] := "I move";
+
+#======================================================================
+# utilities
+#========================================================================
+
+sub strlen(str: [uint8]): (len: uint16) @extern("strlen") is
+@asm "ld de,(", str, ")";
+@asm "ld hl,0";
+@asm "1:";
+@asm "ld a,(de)";
+@asm "or a";
+@asm "ret z";
+@asm "inc de";
+@asm "inc hl";
+@asm "jr 1b";
+end sub;
+
+sub strcpy(dest: [uint8], src: [uint8]) @extern("strcpy") is
+@asm "ld hl,(", src, ")";
+@asm "ld de,(", dest, ")";
+@asm "1:";
+@asm "ld a,(hl)";
+@asm "ld (de),a";
+@asm "or a";
+@asm "ret z";
+@asm "inc hl";
+@asm "inc de";
+@asm "jr 1b";
+end sub;
+
+sub strcat(dest: [uint8], src: [uint8]) @extern("strcat") is
+@asm "ld hl,(", src, ")";
+@asm "ld de,(", dest, ")";
+@asm "1:";
+@asm "ld a,(de)";
+@asm "inc de";
+@asm "or a";
+@asm "jr nz,1b";
+@asm "dec de";
+@asm "2:";
+@asm "ld a,(hl)";
+@asm "ld (de),a";
+@asm "or a";
+@asm "ret z";
+@asm "inc hl";
+@asm "inc de";
+@asm "jr 2b";
+end sub;
+
+sub isalpha(ch: uint8): (ret: uint8) @extern("isalpha") is
+	if (ch >= 'a' and ch <= 'z') or (ch >= 'A' and ch <= 'Z') then
+		ret := TRUE;
+	else
+		ret := FALSE;
+	end if;
+end sub;
+
+sub GETC(): (ret: uint8) @extern("GETC") is
+	var c:= ConIn();
+
+	if isalpha(c) == TRUE then
+		c := c & 0xDF; #toupper
+	end if;
+
+	ret := c;
+end sub;
+
+sub getchars(p: [uint8], max: int16): (ret: uint8) @extern("getchars") is
+	var n: int16;
+
+	n := 0;
+	while n < max loop
+		[p] := GETC();
+		
+		if [p] == '?' then
+			ret := TRUE;
+			return;
+		end if;
+
+		if [p] == CR then
+			[p] := 0;
+			ret := FALSE;
+			return;
+		end if;
+		
+		ConOut([p]);
+		p := p + 1;
+
+		n := n + 1;
+	end loop;
+
+	[p] := 0;
+	ret := FALSE;
+end sub;
+
+#======================================================================
+# VT100 stuff
+#========================================================================
+
+sub gotoxy(x: int16, y: int16) @extern("gotoxy") is
+	# this outputstr the VT100 Escape sequence for cursor positioning 
+	print_char ( ESC ); 
+	print_char ( '[' );
+	print_i16(y+1);
+	print_char ( ';' );
+	print_i16(x+1);
+	print_char ( 'H' );
+end sub;
+
+sub clr_screen() @extern("clr_screen") is 
+	print_char ( ESC ); print( "[2J" );
+	print_char ( ESC ); print_char ( 'H' );
+end sub;  
+
+#==========================================================================
+#  GETLIST -- Find the possible moves for any particular throw of the dice
+#===========================================================================
+
+sub checkpips(whichlist: int16, ptimon: int16, pips: int16, tops: int16) is
+	var j: int16;
+	var k: int16;
+
+	if ptimon == 0 then
+		j := whosebar(get_player()); 	# 0 if you, 25 if me 
+
+		if j > pips then # abs(j - pips);
+			k := j - pips;
+		else
+			k := pips - j;  
+		end if;
+	elseif get_player() == ME then
+		j := ptimon;
+		k := j - pips;
+		if k < 1 then 
+			k := MYHOME;
+		end if;
+	else
+		j := 25 - ptimon;
+		k := j + pips;
+		if k > 24 then 
+			k := YRHOME;
+		end if;
+	end if;
+
+	if get_point_stones(j as uint8) > 0 and get_point_owner(j as uint8) == get_player() then
+
+		# no move to a blocked point 
+		if get_point_owner(k as uint8) != get_player() and get_point_stones(k as uint8) > 1 then
+			return;
+		end if;
+
+		# no move home if i can't bear off yet 
+		if k == whosehome(get_player()) and cantbearoff(j, pips, tops) == TRUE then
+			return;
+		end if;
+
+		# no other move is allowed if i'm on the bar 
+		if tops == 25 and j != whosebar(get_player()) then
+			return;
+		end if;
+
+		# the move is legal (but maybe not optimal) 
+		set_list(whichlist, j, k);
+	end if;
+end sub; 
+
+sub build(whichlist: int16, pips: int16) is
+	var i: int16;
+	var tops: int16;
+
+	if whichlist == cantuse then
+		return;
+	end if;
+
+	tops := topstone(get_player());
+
+	i := 0;
+	while i < 25 loop
+		checkpips( whichlist, i, pips, tops );
+		i := i + 1;
+	end loop;
+end sub;
+
+sub getlist() @extern("getlist") is  # find all legal moves using these dice 
+	var i: int16;
+	var j: int16;
+
+	i := 0;
+	while i < 2 loop  # initialize the lists
+		j := 0; 
+		while j < 28 loop
+			set_list(i, j, ERROR);
+			j := j + 1;
+		end loop;
+		i := i + 1;
+	end loop;
+
+	build(0, get_dice(0)); # usually the low die  
+	build(1, get_dice(1)); # usually the high die 
+end sub; 
+
+#======================================================================
+#  OPPONENT -- A little scenario, in which to select level of play
+#========================================================================
+
+sub chooseplayer() is
+	set_level(xrnd() as int16 % 3);
+	clr_screen();
+ 	draw_board();
+end sub; 
+
+#=======================================================================
+#   PLAY Command - this is the command that initiates the 2-player game
+#=========================================================================
+
+sub cont() is 
+	loop # NO EXIT!  Only a Win or player ESC can exit 
+		rolldice(get_player());
+		getmove();
+		set_player(other(get_player()));
+
+		if get_player() == ME then
+			if endgame() == TRUE then
+				if topstone(ME) < 6 and cubeval() == TRUE then
+					idouble();
+				elseif mytotal() < (yrtotal() - 8) then
+					idouble();
+				end if;
+			elseif bearoff() == TRUE then
+				idouble();
+			end if;
+		end if;
+	end loop;
+end sub;
+
+@impl sub play is
+	whofirst(); 
+	taketurns();
+end sub;
+
+@impl sub whofirst is
+	var myval: int16;
+	var yrval: int16;
+
+	if yrdice == TRUE or get_player() < 0 then        # board has been re-arranged 
+		msg("Is it My "); print(get_token1());
+		print(" turn or Your "); print(get_token2());
+		print(" turn? ");
+@asm "loo:";	
+		ch := GETC();
+		if ch != 'M' and ch != 'Y' then
+			@asm "jp loo";
+		end if;
+		if ch == 'M' then 
+			set_player(YOU);  # player says Me, of course! 
+		else 
+			set_player(ME);
+		end if;
+		rolldice(get_player());
+	elseif get_player() == 0 then  # fresh start, roll the dice 
+		barcube();
+@asm "zoo:";	
+		debug("Tossing for first turn...");
+		wipedice();
+		rolldice(ME);
+		myval := get_dice(0);
+		rolldice(YOU);  
+		yrval := get_dice(0);
+
+		if myval == yrval then
+                        startcubevalue := startcubevalue * 2;
+                        if startcubevalue > 8 then 
+				startcubevalue := 8; 
+			end if;
+			doubles.cube := startcubevalue;
+			gotoxy(37,11);
+			print("[ "); print_i16(doubles.cube); print(" ]");
+                        if (startcubevalue < 9) then
+			    msg("Double the cube!");
+                        end if;
+			@asm "jp zoo";
+		elseif myval < yrval then 
+			set_player(YOU);
+		else 
+			set_player(ME);
+		end if;
+
+		if myval < yrval then
+			set_dice(0, yrval);
+			set_dice(1, myval);
+		else
+			set_dice(0, myval);
+			set_dice(1, yrval);
+		end if;
+	end if;
+	# otherwise, continue with last dice rolled as play is resumed 
+end sub;
+
+@impl sub getmove is  
+	var temp: int16;
+	var happy: uint8;
+	var dummy: uint8;
+
+	cantuse := ERROR;  # important for human player in tellmove 
+	movesleft := 2;
+
+	if get_dice(0) == get_dice(1) then
+		movesleft := movesleft + 2;
+	end if;
+
+	temp := movesleft;		
+
+	getlist(); saveboard(); lookforit := TRUE;
+
+	if nomove() == TRUE then
+		debug("All "); 
+
+		if get_player() == ME then 
+			print("my"); 
+		else 
+			print("your"); 
+		end if;
+
+		print(" moves are blocked! press any key...");
+		dummy := ConIn();
+		return;
+	end if;
+
+	if get_player() == ME then
+		# handle doubles as two consecutive, independent moves 
+		setchat(Imove); debug(&chatter[0]);
+
+		if movesleft == 4 then 
+			myturns := 2; 
+		else 
+			myturns := 1; 
+		end if;
+
+		clrpend();
+
+		while myturns > 0 loop
+			cantuse := ERROR;
+			movesleft := 2;
+
+			while movesleft > 0 loop
+				getlist(); mymove();
+			end loop;
+
+			myturns := myturns - 1;
+		end loop;
+
+		strcat(&chatter[0], "\t."); debug(&chatter[0]);
+	else    # allow the human to take back a bad board position 
+		happy := FALSE;
+
+		while happy == FALSE loop
+			while movesleft > 0 loop  
+				getlist(); yrmove(); 
+			end loop;
+
+			msg("All ok?  Y/N ");
+
+			ch := GETC();
+
+			while ch != 'N' and ch != 'Y' and ch != '\n' loop
+				ch := GETC();
+			end loop;
+
+			if ch == 'N' then
+				msg("Ok, as it was...");
+				restoreboard();
+				update();
+				movesleft := temp;
+				cantuse := ERROR;
+			else 
+				happy := TRUE;
+			end if;
+
+			debug("");
+		end loop;
+	end if;
+end sub; 
+
+@impl sub taketurns is 
+	loop  # NO EXIT!  Only a Win or player ESC can exit 
+		getmove();
+		set_player(other(get_player()));
+		if get_player() == ME then
+			if endgame() == TRUE then
+				if topstone(ME) < 6 and cubeval() == TRUE then
+					idouble();
+				elseif mytotal() < (yrtotal() - 8) then
+					idouble();
+				end if;
+			elseif bearoff() == TRUE then
+					idouble();
+			end if;
+		end if;
+		rolldice(get_player()); 
+	end loop;
+end sub;
+
+#=============================================
+#     Y O U R   M O V E                       
+#=============================================
+
+@impl sub tellmove is  # show what the player's current dice are 
+	var k: int16;
+	var n: int16;
+
+	n := movesleft;
+	debug("You "); 
+	print(get_token2()); print(" ");
+	print("have "); 
+	while n > 0 loop
+		n := n - 1;
+		if get_dice(0) == get_dice(1) then
+			k := get_dice(0);  # doubles?
+		elseif cantuse == 1 then 
+			k := get_dice(0);
+		elseif cantuse == 0 then 
+			k := get_dice(1);
+		elseif n == 1 then 
+			k := get_dice(1);	# 2 of 2? 
+		else 
+			k := get_dice(0);	# 1 of 2? 
+		end if;
+		print_char('['); print_i16(k); print("] ");
+	end loop;
+	print("left");
+	print(", moving from high to low ('?' for help)");
+end sub;
+
+@impl sub yrmove is
+	if nomove() == TRUE then
+		debug("You have no more moves in this line of play.");
+		movesleft := 0;
+	else
+		tellmove();
+		while getyrmove() == FALSE loop
+			tellmove();
+		end loop;
+		debug("");
+	end if;
+end sub;
+
+@impl sub nomove is
+	var i: int16;
+	var j: int16;
+
+	i := 0;
+	while i < 2 loop
+		j := 0; 
+		while j < 28 loop
+			if get_list(i, j) != ERROR then
+				ret := FALSE; return;
+			end if;
+			j := j + 1;
+		end loop;
+		i := i + 1;
+	end loop;
+	ret := TRUE;
+end sub;
+
+@impl sub getyrmove is  
+	var fpoint: int16;
+	var tpoint: int16;
+
+	firstmove := FALSE; # I got it, I got it! 
+
+	msg("Move from? ");
+	fpoint := getpt(YRBAR, YRHOME);
+
+	if fpoint == ERROR or (get_list(0, fpoint) == ERROR and get_list(1, fpoint) == ERROR) then
+		ret := FALSE; return;
+	end if;
+
+	print(" To? ");
+	tpoint := getpt(YRBAR, YRHOME);
+
+	if tpoint == ERROR or (get_list(0, fpoint) != tpoint and get_list(1, fpoint) != tpoint) then
+		ret := FALSE; return;
+	end if;
+
+	movestone(fpoint, tpoint);
+
+	if movesleft < 2 then
+		if get_list(0, fpoint) == tpoint then
+			cantuse := 0;
+		else 
+			cantuse := 1;
+		end if;
+	end if;
+
+	ret := TRUE;
+end sub; 
+
+#==========================================================================
+#====== Functions That Make The Selected Move ======
+#===========================================================================
+
+@impl sub setchat is
+	strcpy(&chatter[0], p);
+end sub;
+
+sub putdice(f: int16, t: int16) is
+	var q: uint8[15];
+
+	if t == MYHOME then
+		strcpy(&q[0], " "); 
+		strcat(&q[0], itoa(25 - f)); 
+		strcat(&q[0], " to Home,");
+	elseif f == MYBAR then
+		strcpy(&q[0], " Bar to "); 
+		strcat(&q[0], itoa(25 - t)); 
+		strcat(&q[0], ",");
+	else 
+		strcpy(&q[0], " "); 
+		strcat(&q[0], itoa(25 - f)); 
+		strcat(&q[0], " to ");
+		strcat(&q[0], itoa(25 - t)); 
+		strcat(&q[0], ",");
+	end if;
+
+	strcat(&chatter[0], &q[0]);
+	debug(&chatter[0]);  # avoid using save_cursor() 
+end sub;
+
+sub lurch(f: int16, t: int16, zlist: int16) @extern("lurch") is
+	movestone(f, t);   # move the stone 
+	putdice(f, t);     # tell user, the action is a bit fast
+ 
+	if movesleft < 2 then
+		cantuse := zlist;
+	end if;
+end sub;
+
+#====================================================================
+#                              MAIN
+#======================================================================
+
+var dummy: int16;
+setup(); 
+
+loop
+	moremsgline := FALSE;  # show first command line on entry 
+
+	debug(""); # erase messages 
+
+	firstmove := TRUE;
+	newboard(); # note, sets starting cube value to 1 
+
+	deciding := TRUE;
+	while deciding == TRUE loop
+		# display command line 
+
+		if show == TRUE then 
+			dummy := mytotal(); dummy := yrtotal();
+		else
+			gotoxy(0,3); blanks(3); gotoxy(0,19); blanks(3);
+		end if;
+
+		msg("Select:  ");
+
+		if moremsgline == TRUE then
+			#printf(p2,(yrdice? "my": "your"));
+			print(p2a);
+			if yrdice == TRUE then
+				print("my");
+			else
+				print("your");
+			end if;
+			print(p2b);
+		else 
+			print(p1); 
+		end if;
+
+		# get response and do it 
+		ch := GETC();
+		case ch is
+			when 'L':
+				msg("");
+				@asm "call _LoadGame"; 
+				startcubevalue := 1;
+				clr_screen();
+				draw_board();
+				update();
+				cont(); 
+			when 'Q':   # quit play, exit to CP/M 
+				exit();  
+			when 'R':   # mirror board image 
+				reverse();
+				update();
+			when 'C':   # show mytotal, yrtotal counts 
+				show := show ^ TRUE;
+			when 'S':   # SWAP Command - exchange stones 
+				swaptokens();
+				update(); 
+			when 'U':
+				yrdice := yrdice ^ TRUE;
+			when 'O':   # change opponents and skill level 
+				chooseplayer();
+				deciding := FALSE;
+			when 'P':   # play the game as board is arranged 
+				chooseplayer();
+				update();
+				play(); 
+			when 'N':   # abandon game without quitting 
+				deciding := FALSE; set_player(0);
+			when else:  
+				moremsgline := moremsgline ^ TRUE; 
+		end case;
+	end loop;
+end loop;

@@ -1,0 +1,1121 @@
+# Gammon IV, by David C. Oshel, Ames, Iowa 
+
+const TRUE := 1;
+const FALSE := 0;
+const ME := 1;
+const YOU := 2;
+const YRBAR := 0;
+const MYBAR := 25;
+const YRHOME := 26;
+const MYHOME := 27;
+const ERROR := 999;   # anything well out of range 
+
+const ESC := 0x1B;
+const CR := 13;
+
+@decl sub exit() @extern("exit");
+@decl sub get_char(): (ret: uint8) @extern("get_char");
+@decl sub print_char(c: uint8) @extern("print_char");
+@decl sub print(ptr: [uint8]) @extern("print");
+@decl sub print_i16(v: int16) @extern("print_i16");
+@decl sub xrndseed() @extern("xrndseed");
+@decl sub xrnd() :(ret: uint16) @extern("xrnd");
+@decl sub itoa(v: int16): (ret: [uint8]) @extern("itoa");
+@decl sub strlen(str: [uint8]): (len: uint16) @extern("strlen");
+@decl sub atoi(p: [uint8]): (ret: int16) @extern("atoi");
+
+@decl sub set_list(i: int16, j: int16, val: int16) @extern("set_list");
+@decl sub get_doubles_cube(): (ret: int16) @extern("get_doubles_cube");
+@decl sub set_doubles_cube(v: int16) @extern("set_doubles_cube");
+@decl sub get_doubles_whosecube(): (ret: int16) @extern("get_doubles_whosecube");
+@decl sub set_doubles_whosecube(v: int16) @extern("set_doubles_whosecube");
+@decl sub get_yrdice(): (ret: uint8) @extern("get_yrdice");
+@decl sub set_yrdice(v: uint8) @extern("set_yrdice");
+@decl sub setchat(p: [uint8]) @extern("setchat");
+@decl sub cantbearoff(mypt: int16, pips: int16, tops: int16 ): (ret: uint8) @extern("cantbearoff");
+@decl sub whosebar( who: int16 ): (ret: int16) @extern("whosebar");
+@decl sub whosehome( who: int16 ): (ret: int16) @extern("whosehome");
+@decl sub winner( who: int16, high: int16 );
+@decl sub halfswap( n: uint8 );
+@decl sub draw_board() @extern("draw_board");
+@decl sub getdice();
+@decl sub highroller( who: int16 );
+@decl sub blanks( n: int16 ) @extern("blanks");
+@decl sub msg(p: [uint8]) @extern("msg");
+@decl sub debug(p: [uint8]) @extern("debug");
+@decl sub putstone( pt: int16, cnt: int16, color: int16 );
+@decl sub barcube() @extern("barcube");
+@decl sub mycube(value: int16);
+@decl sub yrcube(value: int16);
+@decl sub udouble();
+@decl sub get_show(): (ret:int16) @extern("get_show");
+@decl sub set_show(val: int16) @extern("set_show");
+@decl sub gotoxy(x: int16, y: int16) @extern("gotoxy");
+@decl sub clr_screen() @extern("clr_screen");
+@decl sub set_moremsgline(v: int16) @extern("set_moremsgline");
+@decl sub get_startcubevalue(): (ret:int16) @extern("get_startcubevalue");
+@decl sub set_startcubevalue(val: int16) @extern("set_startcubevalue");
+@decl sub GETC(): (ret: uint8) @extern("GETC");
+@decl sub strcat(dest: [uint8], src: [uint8]) @extern("strcat");
+@decl sub get_chatter(): (ret: [uint8]) @extern ("get_chatter");
+@decl sub get_movesleft(): (ret:int16) @extern("get_movesleft");
+@decl sub set_movesleft(val: int16) @extern("set_movesleft");
+@decl sub endgame():(ret: uint8) @extern("endgame");
+@decl sub getchars(p: [uint8], max: int16): (ret: uint8) @extern("getchars");
+@decl sub get_cantuse(): (ret: int16) @extern("get_cantuse");
+@decl sub get_list(i: int16, j: int16): (ret: int16) @extern("get_list");
+@decl sub ConIn(): (ret: uint8) @extern("ConIn");
+
+sub BiosSetup() is
+@asm "jp __BiosSetup";
+end sub;
+
+# variables & get/set routines #######################################
+
+record board is 
+	stones: int16;  # number of stones on that point 
+	owner: int16;   # and whose they are 
+	x: int16;
+	y: int16;       #  x and y coordinates of point base 
+	lastx: int16;
+	lasty: int16;   # last location drawn on this point 
+	cx: int16;
+	cy: int16;      # coordinates for column numbers 
+end record;
+
+var point: board[28];  # 24 points, plus 2 bars, 2 homes 
+
+sub get_point_stones(i: uint8): (ret: int16) @extern("get_point_stones") is
+	ret := point[i].stones;
+end sub;
+
+sub get_point_owner(i: uint8): (ret: int16) @extern("get_point_owner") is
+	ret := point[i].owner;
+end sub;
+
+###
+
+var player: int16;
+
+sub get_player(): (ret: int16) @extern("get_player") is
+ret := player;
+end sub;
+
+sub set_player(v: int16) @extern("set_player") is
+player := v;
+end sub;
+
+###
+
+var dice: int16[2];
+
+sub get_dice(i: uint8): (ret:int16) @extern("get_dice") is
+	ret := dice[i];
+end sub;
+
+sub set_dice(i: uint8, v: int16) @extern("set_dice") is
+	dice[i] := v;
+end sub;
+
+var swapped: int16;
+var tswap: int16;
+var bdsave: board[28]; # 24 points, plus 2 bars, 2 homes 
+
+###
+
+var token1: [uint8];
+var token2: [uint8];
+
+sub get_token1(): (ret: [uint8]) @extern("get_token1") is
+ret := token1;
+end sub;
+
+sub get_token2(): (ret: [uint8]) @extern("get_token2") is
+ret := token2;
+end sub;
+
+###
+
+var myscore: int16;
+var yrscore: int16;
+var YourTurn: [uint8] := "Your Turn: ";
+
+### VT100 ###########################################
+
+var TK1: uint8[] := { 27,'[','3','1','m',  	 # computer's token, ()
+	 		'(',')',
+	 		27,'[','0','m',
+	 		0};
+
+var TK2: uint8[] := { 27,'[','3','4','m',  	 # player's token, []
+	 		'[',']',
+	 		27,'[','0','m',
+	 		0};
+
+var TK3: uint8[] := { 27,'[','3','1','m',  	 # computer's alternate token, {}
+	 		'{','}',
+	 		27,'[','0','m',
+	 		0};
+
+var TK4: uint8[] := { 27,'[','3','4','m',  	 # player's alternate token, <>
+	 		'<','>',
+	 		27,'[','0','m',
+	 		0};
+
+#==========================================================================
+#  EVALUATE UTILITIES -- Functions for legal and/or best play, telling who's
+#			who, who's ahead, who won, etc. etc.
+#============================================================================
+
+sub mytotal(): (ret: int16) @extern("mytotal") is
+	var i: uint8;
+
+	ret := 0;
+	i := 0;
+	while i < 26 loop
+		if point[i].owner == ME then ret := ret + point[i].stones * i as int16; end if;
+		i := i + 1;
+	end loop;
+
+	if get_show() != 0 then
+		gotoxy(0,3); print_i16(ret); 
+	end if;
+end sub;
+
+sub yrtotal(): (ret: int16) @extern("yrtotal") is
+	var i: uint8;
+
+	ret := 0;
+	i := 0;
+	while i < 26 loop
+		if point[i].owner == YOU then ret := ret + point[i].stones * (25 - i as int16); end if;
+		i := i + 1;
+	end loop;
+
+	if get_show() != 0 then
+		gotoxy(0,19); print_i16(ret); 
+	end if;
+end sub;
+
+sub topstone(who: int16): (ret: int16) @extern("topstone") is
+	var i: int16;
+	var j: int16;
+
+	if point[whosebar(who) as uint8].stones > 0 then 
+		i := 25;
+	else
+		i := 24;
+		while i > 0 loop
+			if who == ME then j := i; else j := 25 - i; end if;
+			if point[j as uint8].stones > 0 and point[j as uint8].owner == who then ret := i; return; end if;
+			i := i - 1;
+		end loop;
+	end if;
+	ret := i;  # return normalized value, 1 - 25, 0 is home 
+end sub;
+
+@impl sub cantbearoff is
+	# My destination is Home, but can I do it??? 
+	if mypt > 6 then mypt := 25 - mypt; end if; # normalize inner table 
+
+	# I can't bear off if there's anybody still not in my inner table 
+	if tops > 6 then ret := TRUE; return; end if;
+
+	# If I'm the highest blot in my own table, I CAN bear off 
+	if tops == mypt then ret := FALSE; return; end if;
+
+	# If I'm NOT high, I have to have an exact roll to get away with it 
+	if mypt != pips then
+		ret := TRUE;
+	else
+		ret := FALSE;
+	end if;
+end sub;
+
+@impl sub whosebar is
+	if who == ME then
+		ret := MYBAR;
+	else
+		ret := YRBAR;
+	end if;
+end sub;
+
+@impl sub whosehome is
+	if who == YOU then
+		ret := YRHOME;
+	else
+		ret := MYHOME;
+	end if;
+end sub;
+
+sub checkwin() @extern("checkwin") is  
+	if mytotal() == 0 then winner(ME, topstone(YOU)); end if;
+	if yrtotal() == 0 then winner(YOU, topstone(ME)); end if;
+end sub;
+
+sub other( color: int16 ): (ret: int16) @extern("other") is
+	if color == ME then
+		ret := YOU;
+	else 
+		ret := ME;
+	end if;
+end sub;
+
+@impl sub winner is
+	var gammon: int16; 
+	var ch: uint8;
+
+	if point[whosehome(other(who)) as uint8].stones > 0 then
+		gammon := 1;
+	else 
+		gammon := 2;	# nothing off is a gammon! 
+	end if;
+
+	if high == 0 then 
+		gammon := 1;	# someone doubled 
+	elseif high > 18 then 
+		gammon := 3; 	# backgammon! 
+	end if;
+
+	debug("");
+
+	if who == ME then print("I"); else print("You"); end if; print(" win"); 
+
+	case gammon is
+		when 1: print("!"); 
+		when 2: print(" a Gammon!");
+		when 3: print(" a Backgammon!");
+	end case;
+
+	gammon := gammon * get_doubles_cube();
+
+	case who is
+		when ME: myscore := myscore + gammon;
+		when YOU: yrscore := yrscore + gammon;
+	end case;
+
+	msg("Hit any key to quit play"); 
+	ch := get_char();
+	exit();
+end sub;
+
+#========================================================================
+#  REVERSE Command - allow player to take the opponent's viewpoint of the
+#                    board layout, mirror the board.  Returns board layout
+#		     to the arranged position as seen from opposite side.
+#==========================================================================
+
+sub reverse() @extern("reverse") is
+	var cnt1: int16;
+	var cnt2: int16;
+	var cnt3: int16;
+	var cnt4: int16;
+
+	cnt1 := point[MYHOME].stones;  # save counts for erase 
+	cnt2 := point[YRHOME].stones;
+	cnt3 := point[MYBAR].stones;
+	cnt4 := point[YRBAR].stones;
+
+	putstone( MYHOME, 0, 0);  # erase old trays before update 
+	putstone( YRHOME, 0, 0);
+
+	halfswap(1); halfswap(13);
+
+	gotoxy(0,11);  blanks(4);  # erase HOME message 
+	gotoxy(75,11); blanks(4);
+
+	if point[1].x < 40 then
+		point[MYHOME].x := 0; 
+		point[YRHOME].x := 0;
+	else
+		point[MYHOME].x := 75;
+		point[YRHOME].x := 75;
+	end if;
+
+	point[MYHOME].owner  := ME;
+	point[MYBAR].owner   := ME; # restore counts 
+	point[YRHOME].owner  := YOU;
+	point[YRBAR].owner   := YOU;
+	point[MYHOME].stones := cnt1;
+	point[YRHOME].stones := cnt2;
+	point[MYBAR].stones  := cnt3;
+	point[YRBAR].stones  := cnt4;
+end sub;
+
+@impl sub halfswap is
+	var i: uint8;
+	var j: uint8;
+	var k: int16;
+	var o: uint8;
+
+	o := n + 6;
+	i := n;
+	while i < o loop
+		j := ((o * 2) - 1) - i;
+		k := point[i].x;
+		point[i].cx := point[j].x;
+		point[i].x := point[j].x;
+		point[j].cx := k;
+		point[j].x := k;
+		i := i + 1;
+	end loop;
+end sub;
+
+sub wipedice() @extern("wipedice") is
+	gotoxy(47,11); blanks(18);	 # erase dice roll messages 
+	gotoxy(12,11); blanks(18);	
+end sub;
+
+sub update() @extern("update") is
+	var i: uint8;
+	var x: int16;
+	var c: int16;
+	var p: [uint8];
+
+	i := 1;
+	while i < 25 loop
+		gotoxy(point[i].cx, point[i].cy);
+		p := itoa(25 - i as int16); print(p); if strlen(p) == 1 then print_char(' '); end if;	#printf("%2d",25 - i);
+		i := i + 1;
+	end loop;
+
+	if get_doubles_whosecube() == YOU then yrcube(get_doubles_cube());  
+	elseif get_doubles_whosecube() == ME then mycube(get_doubles_cube()); 
+	else barcube();
+	end if;
+
+	i := 0;
+	while i < 28 loop
+		x := point[i].stones;
+		c := point[i].owner;
+		putstone(i as int16, x, c);
+		i := i + 1;
+	end loop;
+
+	if point[1].x < 40 then x := 0; else x := 75; end if;
+
+	gotoxy(x,11); print("HOME");
+
+	x := mytotal(); x := yrtotal();
+end sub;
+
+#==========================================================================
+#  INITIALIZATION and NEWBOARD commands -- start of a new game, or cold
+#===========================================================================
+
+sub wipeout() is
+	var i: uint8;
+
+	player := 0;
+	barcube();
+
+	i := 0;
+	while i < 28 loop
+		point[i].stones := 0;
+		point[i].owner := 0;
+		i := i + 1;
+	end loop;
+
+	update();
+end sub;
+
+sub setup() @extern("setup") is
+	var i: uint8;
+	var j: uint8;
+	var k: int16;
+
+	BiosSetup();
+	xrndseed();
+
+	myscore := 0;
+	yrscore := 0; 
+	player := 0; 
+	dice[0] := 0;
+ 	dice[1] := 0;
+	swapped := FALSE;
+	tswap := FALSE;
+	set_yrdice(FALSE);
+	set_show(TRUE);
+	set_moremsgline(TRUE);
+
+	token1 := &TK1[0];
+	token2 := &TK2[0];
+
+	draw_board();
+
+	i := 0;
+	while i < 28 loop
+		point[i].stones := 0;
+		point[i].owner := 0;
+		point[i].x := 0;
+		point[i].y := 0;
+		point[i].lastx := 0;
+		point[i].lasty := 0;
+		point[i].cx := 0;
+		point[i].cy := 0;
+		i := i + 1;
+	end loop;
+
+	k := 68;
+
+	i := 1;
+	while i < 13 loop # establish xy coords for the points 
+		j := 25 - i;
+		point[i].cx := k;
+		point[j].cx := k;
+		point[i].x := k;
+		point[j].x := k; 
+		k := k - 5;
+		point[i].y := 4;
+		point[j].y := 18;
+		point[i].cy := 2;
+		point[j].cy := 20;
+		if k == 38 then k := k - 5; end if; # skip over bar
+		i := i + 1; 
+	end loop;
+
+	point[MYBAR].x := 38; 
+	point[YRBAR].x := 38;
+	point[MYHOME].x := 75;
+	point[YRHOME].x := 75;
+
+	point[MYBAR].y := 5;
+	point[MYHOME].y := 5;
+	point[YRBAR].y := 17; 
+	point[YRHOME].y := 17;
+end sub;
+
+sub newboard() @extern("newboard") is
+    	set_startcubevalue(1);
+	wipedice(); wipeout();
+
+	putstone( MYHOME, 15, ME  );
+	putstone( YRHOME, 15, YOU );
+
+	putstone( YRHOME, 13, YOU );
+	putstone(  1, 2, YOU );
+
+	putstone( YRHOME, 8, YOU );
+	putstone( 12, 5, YOU );
+
+	putstone( YRHOME, 5, YOU );
+	putstone( 17, 3, YOU );
+
+	putstone( YRHOME, 0, 0 ); 
+	putstone( 19, 5, YOU );
+
+	putstone( MYHOME, 10, ME );
+	putstone(  6, 5, ME  );
+
+	putstone( MYHOME,  7, ME );
+	putstone(  8, 3, ME  );
+
+	putstone( MYHOME,  2, ME );
+	putstone( 13, 5, ME  );
+
+	putstone( MYHOME, 0, 0 );
+	putstone( 24, 2, ME  );
+end sub;
+
+var picture0: [uint8] := "Gammon IV, by David C. Oshel, Ames, Iowa\n\n\n";
+var picture1: [uint8] := ":=================================o=================================:\n";
+var picture2: [uint8] := ":: ..   \\/   ..   \\/   ..   \\/   |||  ..   \\/   ..   \\/   ..   \\/  ::\n";
+var picture3: [uint8] := "::                               |||                               ::\n";
+var picture4: [uint8] := ":: /\\   ..   /\\   ..   /\\   ..   |||  /\\   ..   /\\   ..   /\\   ..  ::\n";
+
+@impl sub draw_board is
+	var line: int16;
+
+	clr_screen();
+	gotoxy(0,0);
+	blanks(5); print(picture0);
+	blanks(5); print(picture1);
+
+	line := 0;
+	while line < 6 loop 
+		blanks(5); print(picture2);
+		line := line + 1;
+	end loop;
+
+	blanks(5); print(picture3);
+	blanks(5); print(picture3);
+	blanks(5); print(picture3);
+
+	line := 0;
+	while line < 6 loop
+		blanks(5); print(picture4);
+		line := line + 1;
+	end loop;
+
+	blanks(5); print(picture1);
+end sub;
+
+#=========================================================================
+#  DICE Commands:  How to roll the dice
+#===========================================================================
+
+sub peek() is
+	if get_yrdice() == TRUE then return; end if; # you know your own dice, probably...? 
+	debug("The Dice will Rattle until you Roll.  Now on ");
+	getdice();
+	#printf("[%d] [%d] ...",dice[0],dice[1]);
+	print_char('[');
+	print_i16(dice[0]);
+	print("] [");
+	print_i16(dice[1]);
+	print("] ...");
+end sub;
+
+sub getonedie(): (ret: int16) is
+	ret := (xrnd() % 6) as int16 + 1;
+end sub;
+
+sub fixup() is
+	# ensure that the low die is in dice[0] 
+	var d: int16;
+	var e: int16;
+
+	if player == 0 then return; end if; # whofirst?  don't mess with the odds 
+
+	# d = min(dice[0],dice[1]);
+	# e = max(dice[0],dice[1]);
+
+	if dice[0] < dice[1] then 
+		d := dice[0];
+		e := dice[1];
+ 	else
+		d := dice[1];
+		e := dice[0];
+	end if;
+
+	dice[0] := d;
+	dice[1] := e;
+end sub;
+
+@impl sub getdice is
+	var ch: uint8;
+
+        # if it's MY dice we're using, generate random dice... 
+	if get_yrdice() == FALSE then
+		dice[0] := getonedie(); 
+		dice[1] := getonedie();
+		fixup();
+		return;
+	end if;
+
+        # but if it's YOUR dice, then ask about the roll... 
+@asm "zoo1:";
+	msg("<> ");
+	if player == ME then print("My"); else print("Your"); end if;
+	print(" roll: ");
+	print("\t\t, using your dice: ");
+	print(" First? ");
+@asm "loo1:";
+	ch := GETC();  # don't bother acg 
+	ch := ch - '0';
+	if ch < 1 or  ch > 6 then @asm "jp loo1"; end if;
+	print_char ( ch + '0');
+	dice[0] := ch as int16;
+
+	print("  Second? ");
+	ch := GETC();
+	ch := ch - '0';
+	if ch < 1 or  ch > 6 then @asm "jp zoo1"; end if;
+	print_char ( ch + '0');
+	dice[1] := ch as int16;
+
+	print("  All Ok? ");
+	ch := GETC();  # don't bother acg 
+	if ch != 'N' and  ch != 'Y' then @asm "jp zoo1"; end if;
+	fixup();
+end sub;
+
+sub rolldice( who: int16 ) @extern("rolldice") is
+	var waiting: int16;
+
+	setchat(YourTurn);
+	
+	if get_yrdice() == FALSE then strcat(get_chatter(), " Peek,"); end if; 
+
+	strcat(get_chatter(), " Double, Quit, Save, or <AnyKey> to Roll ");
+
+	if player == YOU then
+				  # not executed if player == 0, i.e., whofirst 
+		waiting := TRUE; 
+		while waiting == TRUE loop
+			msg(get_chatter());
+			case GETC() is
+				when 'S': msg(""); @asm "call _SaveGame"; exit();
+				when 'P': peek(); 
+				when 'D': udouble(); 
+				when 'Q': exit();
+				when else: waiting := FALSE;
+			end case;
+		end loop;
+		debug(""); msg("");
+	end if;
+
+	highroller(who);
+end sub; 
+
+@impl sub highroller is
+			  # parameter is not redundant 
+	var y: int16 := 11;
+	var xme: int16;
+	var xyu: int16;
+
+	# get the values for two dice, either yours or mine 
+
+	getdice();
+
+	# display the values of the dice in the board area 
+
+	xme := 47; xyu := 12;    
+			# decide which half to show the values in
+
+	if point[1].x > 40 then 
+		xme := 12; 
+		xyu := 47; 
+	end if;
+
+	if player > 0 then
+		gotoxy(xyu,y); blanks(18); # erase, if not whofirst 
+		gotoxy(xme,y); blanks(18);
+	end if;
+
+	if who == ME then
+		gotoxy(xme,y); print("My");
+	else
+		gotoxy(xyu,y); print("Your");
+	end if;
+
+	#printf(" Roll> [%d] ",dice[0]);
+	print(" Roll> [");
+	print(itoa(dice[0]));
+	print("] ");
+
+	if player > 0 then
+ 		#printf("[%d] ",dice[1]); # whofirst doesn't show this 
+		print_char('[');
+		print(itoa(dice[1]));
+		print("] ");
+	end if;
+end sub;
+
+sub saveboard() @extern("saveboard") is
+	var i: uint8 := 0;
+
+	while i < 28 loop
+		bdsave[i].stones := point[i].stones;
+		bdsave[i].owner  := point[i].owner;
+		i := i + 1;
+	end loop;
+end sub;
+
+sub restoreboard() @extern("restoreboard") is
+	var i: uint8 := 0;
+
+	while i < 28 loop
+		point[i].stones := bdsave[i].stones;
+		point[i].owner  := bdsave[i].owner;
+		i := i + 1;
+	end loop;
+end sub;
+
+sub swaptokens() @extern("swaptokens") is
+	var temp: [uint8];
+
+	swapped := swapped ^ TRUE;
+
+	if swapped == TRUE then
+		temp := token1;
+		token1 := token2;
+		token2 := temp;
+	else
+		tswap := tswap ^ TRUE;
+
+		if tswap == TRUE then
+			token1 := &TK3[0];
+			token2 := &TK4[0];
+		else 
+			token1 := &TK1[0];
+			token2 := &TK2[0];
+		end if;
+	end if;
+end sub;
+
+@impl sub blanks is
+	while n > 0 loop
+		print_char (' ');
+		n := n - 1;
+	end loop;
+end sub;
+
+@impl sub msg is
+	gotoxy(5,23); blanks(74);
+	gotoxy(5,23); print(p); 
+end sub;
+
+@impl sub debug is
+	gotoxy(5,22); blanks(74);
+	gotoxy(5,22); print(p); 
+end sub;
+
+sub nxtyp(i: int16): (ret: int16) is
+	if i > 9 then ret := i - 1 ; else ret := i + 1 ; end if;
+end sub;
+
+sub isbar(p: int16): (ret: uint8) is
+  	#return (( p == MYBAR ) or  ( p == YRBAR ));
+	if p == MYBAR then ret := TRUE;
+	elseif p == YRBAR then ret := TRUE;
+	else ret := FALSE;
+	end if;
+end sub;
+
+sub ishome(p: int16): (ret: uint8) is
+   	#return (( p == MYHOME ) or  ( p == YRHOME ));
+	if p == MYHOME then ret := TRUE;
+	elseif p == YRHOME then ret := TRUE;
+	else ret := FALSE;
+	end if;
+end sub;
+
+@impl sub putstone is
+	var i: int16;
+	var xp: int16;
+	var yp: int16;
+	var slack: int16;
+	var background: [uint8];
+	var token: [uint8];
+
+	if cnt < 1 then
+			 # empty point has neither stones nor owner 
+            cnt   := 0; 
+            color := 0;  
+        end if;
+
+	point[pt as uint8].stones := cnt;    # number of stones on this point 
+	point[pt as uint8].owner  := color;  # and whose they are 
+
+        # stack stones 5 high in the home tray, 6 high on the points 
+	if isbar(pt) == TRUE or ishome(pt) == TRUE then slack := 5; else slack := 6; end if;
+
+        # locate the base address of the point for animation 
+	xp := point[pt as uint8].x;  
+	yp := point[pt as uint8].y; 
+
+        # decide on the background pattern to be used for empty places 
+	if pt > 12 then 
+		background := "/\\  ";  
+	else 
+		background := "\\/  ";
+	end if;
+
+	if point[1].x < 40 then
+		if (pt % 2) == 1 then
+			background := "..  ";
+		end if;
+	elseif (pt % 2) == 0 then
+		background := "..  ";
+	end if;
+
+	if ishome(pt) == TRUE then background := "    "; end if;
+	if isbar(pt) == TRUE then  background := "||| "; end if;
+
+        # get the token pattern to be used 
+	if color == ME then
+		token := token1;  
+	else
+		token := token2;
+	end if;
+
+        # draw the entire point with token and background patterns 
+
+	# first erase all blots from this point (draw the background) 
+	i := 0;
+	while i < slack loop
+		gotoxy(xp,yp);
+		print(background);     # string has point's width 
+		point[pt as uint8].lastx := 0;  # future, not implemented 
+                point[pt as uint8].lasty := 0;
+		yp := nxtyp(yp);
+		i := i + 1;
+	end loop;
+
+	# now draw all the blots there are on this point onto the point 
+	i := 0;
+	while i < cnt loop
+		xp := point[pt as uint8].x + (i / slack);
+		if (i % slack) == 0 then yp := point[pt as uint8].y; end if;
+		gotoxy(xp, yp);
+		print(token);
+		point[pt as uint8].lastx := xp;  # future, not implemented 
+		point[pt as uint8].lasty := yp;
+		yp := nxtyp(yp);
+		i := i + 1;
+	end loop;
+end sub;
+
+sub hitblot(from: int16, color: int16 ) is
+	var barpt: int16;
+	var addone: int16;
+
+	barpt := whosebar( color );
+	putstone(from, 0, 0);
+	addone := point[barpt as uint8].stones + 1;
+	putstone( barpt, addone, color );
+end sub;
+
+sub movestone( from: int16, to: int16) @extern("movestone") is
+	var opponent: int16;
+	var subone: int16;
+	var addone: int16;
+
+	opponent := other( player );
+	if point[to as uint8].owner == opponent then hitblot(to, opponent); end if;
+
+	subone := point[from as uint8].stones - 1;
+	addone := point[to as uint8].stones + 1;
+
+	putstone(from, subone, player);
+	putstone(to, addone, player);
+
+	set_movesleft(get_movesleft() - 1);
+
+	checkwin();  # never but NEVER let a win go unnoticed! 
+end sub; 
+
+#========================================================================
+#  CUBE Commands -- commands related to the cube, doubling, etc.
+#=========================================================================
+
+sub notyrcube() is
+	gotoxy(75,19); blanks(5);
+	gotoxy(75,20); blanks(5);
+end sub;
+
+sub notmycube() is
+	gotoxy(75,2); blanks(5);
+	gotoxy(75,3); blanks(5);
+end sub;
+
+@impl sub barcube is
+        # startcubevalue is normally 1, but it may have doubled 
+        # if the opening rolloff for first turn came up doubles 
+	set_doubles_cube(get_startcubevalue());
+	set_doubles_whosecube(0);
+	notmycube(); notyrcube();
+        gotoxy(37,11);
+        if get_startcubevalue() == 1 then 
+		print("[BAR]");
+	elseif get_doubles_cube() < 16 then 
+		#printf("[ %d ]", doubles.cube);
+		print("[ ");
+		print_i16(get_doubles_cube());
+		print(" ]");
+	else 
+		#printf("[%03d]",doubles.cube); 
+		print_char('[');
+		print_i16(get_doubles_cube());
+		print_char(']');
+	end if;
+end sub;
+
+sub notbarcube() is
+	gotoxy(37,11); print(" BAR ");
+end sub;
+
+@impl sub mycube is
+	notbarcube(); gotoxy(75,2); print("CUBE");
+	gotoxy(75,3); 
+	#sprintf(buzzard,"[%d]",value); 
+	#printf("%-5s",buzzard);
+	print_char('[');
+	print(itoa(value));
+	print_char(']');
+	set_doubles_whosecube(ME);
+end sub;
+
+@impl sub yrcube is
+	notbarcube(); gotoxy(75,19); print("CUBE");
+	gotoxy(75,20); 
+	#sprintf(buzzard,"[%d]",value); 
+	#printf("%-5s",buzzard);
+	print_char('[');
+	print(itoa(value));
+	print_char(']');
+	set_doubles_whosecube(YOU);
+end sub;
+
+sub idouble() @extern("idouble") is
+	var ch: uint8;
+
+	if get_doubles_whosecube() == YOU then return; end if;  # not mine, can't double! 
+	if get_doubles_cube() > 256 then return; end if;    # maximum, don't consider it 
+
+	notbarcube();
+	debug("I double.  Will you accept the cube ");
+	#printf("at %d points? ",doubles.cube * 2);
+	print("at ");
+	print_i16(get_doubles_cube() * 2);
+	print(" points? ");
+
+	loop
+		ch := GETC();
+		if ch == 'Y' then
+			notmycube();
+			set_doubles_cube(get_doubles_cube() * 2);
+			yrcube(get_doubles_cube());
+			break;
+		elseif ch == 'N' then winner(ME,0); 
+		end if;
+	end loop;
+end sub;
+
+sub backgame(): (ret: uint8) is
+	var max: int16;
+	var barred: int16;
+	var count: int16;
+	var i: uint8;
+
+	if topstone(YOU) < 12 and topstone(ME) > 18 then
+		if mytotal() < yrtotal() + 4 then ret := TRUE; return; end if;
+		max := 0; barred := 0; count := 0;
+		i := 24;
+		while i > 18 loop
+			if point[i].owner == ME then
+				max := i as int16;
+				if point[i].stones > 1 then barred := barred + 1; end if;
+				count := count + point[i].stones;
+			end if;
+			i := i - 1;
+		end loop;
+		#ret := (max < topstone(YOU) + 1) and (barred > 1 and count < 7);
+		if max < topstone(YOU) + 1 and barred > 1 and count < 7 then ret := TRUE;
+		else ret := FALSE;
+		end if;
+	else
+		#return ( mytotal() < yrtotal() + 24 );
+		if mytotal() < yrtotal() + 24 then ret := TRUE;
+		else ret := FALSE;
+		end if;
+	end if;
+end sub;
+
+sub cubeval(): (ret: uint8) @extern("cubeval") is
+	var ineed: int16;
+	var yuneed: int16;
+	var yrtop: int16;
+	var mytop: int16;
+
+	if endgame() == TRUE then
+		# calculate the number of dice that are required to end 
+		# the game, with appropriate fudge factors for position 
+
+		yrtop := topstone(YOU);
+		mytop := topstone(ME);
+
+		ineed := 15 - point[MYHOME].stones;
+		yuneed := 15 - point[YRHOME].stones;
+
+		if yrtop < 4 and yuneed < 3 then ret := FALSE; return; end if; # obvious 
+
+		# topstones still running?  use a different method 
+		if mytop > 6 or yrtop > 6 then
+			ineed  := 2 * (mytotal() / 8) + 1; # number of dice 
+			yuneed := 2 * (yrtotal() / 8) + 1;
+		end if;
+
+		# count the stones on point 6 twice, they're losers 
+		yuneed := yuneed + point[6].stones;
+		ineed := ineed + point[6].stones;
+
+		# you doubled, so you have the roll 
+		yuneed := yuneed - 2;
+
+		# odd number left? 
+		if ineed % 2 == 1 then ineed := ineed + 1; end if;
+		if yuneed % 2 == 1 then yuneed := yuneed + 1; end if;
+
+		# is the one point empty? 
+		if ineed  > 4 and  mytop > 3 and  point[24].stones == 0 then ineed := ineed + 1 ; end if;
+		if yuneed > 4 and  yrtop > 3 and  point[ 1].stones == 0 then yuneed := yuneed + 1; end if;
+
+		if mytop < yrtop and  ineed < yuneed then ret := TRUE; return; end if;
+		if yrtop < 5 and  yuneed < ineed then ret := FALSE; return; end if;
+		if yuneed >= ineed then ret := TRUE; else ret := FALSE; end if;
+	else 
+		ret := backgame();
+	end if;
+end sub;
+
+sub testcube() is
+	if cubeval() == TRUE then
+		debug("I accept the cube.");
+		notyrcube();
+		set_doubles_cube(get_doubles_cube() * 2);
+		mycube(get_doubles_cube());
+	else 
+		winner(YOU,0);
+	end if;
+end sub;
+
+@impl sub udouble is
+	if get_doubles_whosecube() == ME then
+		debug("It's MY cube, dummy!"); 
+	else 
+		testcube();
+	end if;
+end sub;
+
+sub getpt(b: uint8, h: uint8): (ret: int16) @extern("getpt") is
+	var ans: uint8[6];
+	var p: [uint8]; 
+	var look: int16;
+	var try: int16;
+	var ch: uint8;
+
+	p := &ans[0];
+
+	if getchars(&ans[0], 5) == TRUE then
+		ret := ERROR;
+		msg("");
+		if point[ whosebar(player) as uint8].stones > 0 then
+			print("You're on the Bar, so let's move that one!  BAR ");
+			ret := b as int16;
+		else 
+			print("Are you ");
+			if get_cantuse() != 0 and get_cantuse() != 1 then print("REALLY "); end if;
+			print("blocked?  Try moving From ");
+			look := 24;
+			while look > 0 loop
+				try := get_list(0, look);
+				if try == ERROR then try := get_list(1, look); end if;
+				if try != ERROR then
+					#printf("%d To ",25-look);
+					print_i16(25-look);
+					print(" To ");
+					if try == YRHOME then 
+						print("HOME");
+					else 
+						#printf("%d",25-try);
+						print_i16(25-try);
+					end if;
+					look := 0;
+				end if;
+				look := look - 1;
+			end loop;
+		end if;
+
+		ch := ConIn();
+	elseif ans[0] == 'B' then ret := b as int16;
+	elseif ans[0] == 'H' then ret := h as int16;
+	else 
+		ret := atoi( &ans[0] );
+		if ret < 1 or ret > 24 then ret := ERROR;
+		else ret := 25 - ret;  # translate human to computer view 
+		end if;
+	end if;
+end sub;
+

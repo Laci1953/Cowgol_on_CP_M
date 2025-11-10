@@ -1,0 +1,935 @@
+# Gammon IV, by David C. Oshel, Ames, Iowa 
+
+#--------------------------------------------------------------------
+# GAMEPLAN -- separately compiled module, contains the tactics and 
+#               strategy for making the computer's move in Gammon IV 
+#--------------------------------------------------------------------
+
+@decl sub print(ptr: [uint8]) @extern("print");
+@decl sub strcat(dest: [uint8], src: [uint8]) @extern("strcat");
+
+@decl sub get_list(i: int16, j: int16): (ret: int16) @extern("get_list");
+@decl sub get_point_stones(i: uint8): (ret: int16) @extern("get_point_stones");
+@decl sub get_point_owner(i: uint8): (ret: int16) @extern("get_point_owner");
+@decl sub get_dice(i: int16): (ret:int16) @extern("get_dice");
+@decl sub set_dice(i: int16, v: int16) @extern("set_dice");
+@decl sub get_movesleft(): (ret:int16) @extern("get_movesleft");
+@decl sub set_movesleft(val: int16) @extern("set_movesleft");
+@decl sub set_cantuse(val: int16) @extern("set_cantuse");
+@decl sub get_myturns(): (ret:int16) @extern("get_myturns");
+@decl sub set_myturns(val: int16) @extern("set_myturns");
+@decl sub get_firstmove(): (ret:int16) @extern("get_firstmove");
+@decl sub set_firstmove(val: int16) @extern("set_firstmove");
+@decl sub get_lookforit(): (ret:uint8) @extern("get_lookforit");
+@decl sub set_lookforit(val: uint8) @extern("set_lookforit");
+@decl sub get_chatter(): (ret: [uint8]) @extern ("get_chatter");
+@decl sub nomove(): (ret: uint8) @extern("nomove");
+@decl sub setchat(p: [uint8]) @extern("setchat");
+@decl sub lurch(f: int16, t: int16, zlist: int16) @extern("lurch");
+@decl sub topstone(who: int16): (ret: int16) @extern("topstone");
+@decl sub update() @extern("update");
+@decl sub restoreboard() @extern("restoreboard");
+@decl sub debug(p: [uint8]) @extern("debug");
+
+const TRUE := 1;
+const FALSE := 0;
+const ME := 1;
+const YOU := 2;
+const YRBAR := 0;
+const MYBAR := 25;
+const YRHOME := 26;
+const MYHOME := 27;
+const ERROR := 999;   # anything well out of range 
+const MYLEVEL := 2;
+
+# variables & get/set routines ########################
+
+record _pending is
+	fr: int16;
+	to: int16;
+	flag: int16; 
+end record;
+
+var pending: _pending;
+
+var level: int16;
+
+sub get_level(): (ret:int16) @extern("get_level") is # ???
+	ret := level;
+end sub;
+
+sub set_level(v: int16) @extern("set_level") is
+level := v;
+end sub;
+
+#=============================================
+#     M Y   M O V E                           
+#=============================================
+
+sub naked(): (ret: uint8) is
+				# am I leaving too many blots? 
+	var i: uint8;
+	var clink: int16;
+
+	i := 24;  clink := 0;
+
+	while i > 0 loop
+		if get_point_stones(i) == 1 and get_point_owner(i) == ME then
+			clink := clink + 1; 
+		end if;
+		i := i - 1;
+	end loop;
+
+	if clink > 2 then
+		ret := TRUE;
+	else
+		ret := FALSE;
+	end if;
+end sub;
+
+sub yourfolly(): (ret: uint8) is
+	 			# look for lotsa blots in your inner table 
+	var i: uint8;
+	var clink: int16;
+
+	i := 18; clink := 0;
+
+	while i < 25 loop
+		if get_point_owner(i) == YOU and get_point_stones(i) == 1 then 
+			clink := clink + 1;
+		end if; 
+
+		i := i + 1;
+	end loop;
+
+	if clink >= 3 then
+		ret := TRUE;
+	else
+		ret := FALSE;
+	end if;
+end sub;
+
+sub goodboard(): (ret: uint8) is
+				# look for four made points near my inner table 
+	var i: uint8;
+	var clank: int16;
+	var clink: int16;
+
+	i := 9; clank := 0;
+
+	while i > 3 loop
+		if get_point_owner(i) == ME and get_point_stones(i) > 1 then
+			clank := clank + 1;
+		end if;
+
+		i := i - 1;
+	end loop;
+
+	if clank > 4 then ret := TRUE; return; end if;  # bar is nearly blocked 
+
+	i := 6; clank := 0; clink := 0;
+
+	while i > 0 loop
+		if get_point_owner(i) == ME then 
+			if get_point_stones(i) == 1 then 
+				clink := clink + 1; 
+			else 
+				clank := clank + 1;
+			end if;
+		end if;
+
+		i := i - 1;
+	end loop;
+
+	if clank > 3 and clink < 2 then
+		ret := TRUE;
+	else
+		ret := FALSE;
+	end if;
+end sub;
+
+sub bearoff(): (ret: uint8) @extern("bearoff") is
+	if topstone(ME) < 7 then
+		ret := TRUE;
+	else
+		ret := FALSE;
+	end if;
+end sub;
+
+sub scanahead(from: int16 ): (ret: int16) is
+	var count: int16;
+
+	count := 0;
+
+	from := from - 1;
+
+	while from > 0 loop
+		count := count + 1;
+
+		if get_point_owner(from as uint8) == YOU then
+			ret := count; return;
+		end if;
+
+		from := from - 1;
+	end loop;
+	ret := 7;
+end sub;
+
+sub endgame():(ret: uint8) @extern("endgame") is
+				# Is no strategy required from here on in? 
+	if 25 - topstone(YOU) > topstone(ME) then
+		ret := TRUE;
+	else
+		ret := FALSE;
+	end if;
+end sub;
+
+#------------------------------------------------------------
+# MATCHUP                                                    
+#                                                            
+# 2-stone functions that force the choice of the next move.  
+# These are the HEART and SOUL of this backgammon algorithm! 
+#------------------------------------------------------------
+
+sub setpend(from: int16, to: int16 ) is
+	pending.fr   := from;
+	pending.to   := to;
+	pending.flag := TRUE;
+end sub;
+
+sub clrpend() @extern("clrpend") is
+	pending.flag := FALSE;
+end sub;
+
+interface f4(f1: int16, t1: int16, f2: int16, t2:int16): (ret: int16);
+interface f2(from: int16, to: int16): (ret: uint8);
+
+var vf4: f4;
+var vf2: f2;
+
+sub natural implements f4 is
+	clrpend();
+
+	if get_point_stones(t2 as uint8) == 1 and t1 == f2 then setpend(f2, t2); end if;
+
+	ret := pending.flag;
+end sub;
+
+# set vf4 before calling...
+sub matchup(): (ret: uint8) is
+	var i: int16;
+	var j: int16;
+	var ti: int16;
+	var tj: int16;
+
+	if pending.flag == TRUE then ret := FALSE; return; end if; # this is probably redundant 
+
+	i := 1;
+	while i < 26 loop
+		ti := get_list(0, i);
+
+		if ti != ERROR then
+			j := 1;
+			while j < 26 loop
+				tj := get_list(1, j);
+
+				if tj != ERROR then
+					if (vf4)( i, ti, j, tj ) == TRUE then
+						lurch( i, ti, 0);
+						ret := TRUE;
+						return;
+					end if;
+				end if;
+
+				j := j + 1;
+			end loop;
+
+		end if;
+
+		i := i + 1;
+	end loop;
+
+	ret := FALSE;
+end sub;
+
+#--------------------------------------------------------
+# CLOCKWISE and COUNTERCLOCK                             
+#                                                        
+# the rest of these are single-stone decisions based on  
+# rules of thumb, board-scanning functions               
+#--------------------------------------------------------
+
+sub plainstupid(from: int16): (ret: uint8) is
+					# don't break a safe point 
+	if from < 13 and get_point_stones(from as uint8) == 2 and scanahead(from) < 7 then
+		ret := TRUE;
+	else
+		ret := FALSE;
+	end if;
+end sub;
+
+sub unwise(innertablept: int16): (ret: uint8) is
+					# if it's a hit, just for god's sake don't put him on the bar!! 
+	if innertablept < 7 then
+		if get_point_owner(innertablept as uint8) == YOU or get_point_stones(YRBAR) > 0 then 
+			ret := TRUE; return;
+		end if;
+	end if;
+
+	ret := FALSE;
+end sub;
+
+sub covermine implements f2 is
+	if from < 8 then ret := FALSE; return; end if;
+	if get_point_stones(to as uint8) == 1 and get_point_owner(to as uint8) == ME then
+		ret := TRUE;
+	else
+		ret := FALSE;
+	end if;
+end sub;
+
+sub idareyou implements f2 is
+	if unwise( to ) == TRUE then ret := FALSE; return; end if;
+	if get_point_stones(from as uint8) != 2 
+		and get_point_stones(to as uint8) < 2
+		and scanahead( to ) > 6 then ret := TRUE;
+	else ret := FALSE;
+	end if;
+end sub;
+
+sub hitandrun implements f2 is
+	if get_point_owner(to as uint8) == YOU then
+		ret := TRUE;
+	else
+		ret := FALSE;
+	end if;
+end sub;
+
+sub dbuild implements f2 is
+	var diceleft: int16;
+
+	if get_myturns() != 0 then
+		diceleft := 2 + get_movesleft();
+	else
+		diceleft := get_movesleft();
+	end if;
+
+	if diceleft > 1 then
+		# can't possibly be only one stone on from point 
+		# or kamikaze would have covered it on last move 
+		if get_point_stones(to as uint8) == 0 then
+			ret := TRUE;
+		else
+			ret := FALSE;
+		end if;
+	end if;
+
+	ret := FALSE;
+end sub;
+
+sub kamikaze implements f2 is 
+# cover my distant blot, or razzle-dazzle 'em with the long doubles hit 
+	var j: int16;
+	var k: int16;
+	var diceleft: int16;
+	
+	k := from; 
+	j := from - to;
+	diceleft := get_myturns() * get_movesleft();  # NB: 2*2 == 2+2, "fourtunately" 
+
+	while diceleft > 0 loop   # predicting where doubles land is easy! 
+		diceleft := diceleft - 1;
+		k := k - j;
+		if k < 1 then ret := FALSE; return; end if; # out of bounds 
+		if get_point_stones(k as uint8) == 0 then continue; end if;       # simplify 
+		if get_point_stones(k as uint8) == 1 then   # found my blot or yours? 
+			ret := TRUE; return;
+		elseif get_point_owner(k as uint8) == YOU then   # found your blockade? 
+			ret := FALSE; return; 
+		end if;        # found my safe point, so ignore it 
+	end loop;
+	ret := FALSE;
+end sub;
+
+sub foolsdemise implements f2 is 
+        # annihilate orphaned blots in enemy's inner, my outer table 
+	if to > 17 and get_point_owner(to as uint8) == YOU then
+		ret := TRUE;
+	else
+		ret := FALSE;
+	end if;
+end sub;
+
+sub landonme implements f2 is
+	if plainstupid(from) == TRUE then ret := FALSE; return; end if;
+
+	if get_point_stones(from as uint8) == 1 then
+		if from < 19 and to > 6 then 
+			ret := TRUE; 
+		else	
+			ret := FALSE;
+		end if;
+	else
+		if get_point_owner(to as uint8) == ME and get_point_stones(to as uint8) < 4 then
+			ret := TRUE;
+		else
+			ret := FALSE;
+		end if;
+	end if;
+end sub;
+
+# these evaluations have meaning only in the endgame 
+
+sub nobackgammon implements f2 is
+	 				# endgame 
+	if from > 19 then
+		ret := TRUE;
+	else
+		ret := FALSE;
+	end if;
+end sub;
+
+sub crosstable implements f2 is 
+	# always move a table ahead if possible, in the endgame 
+	if from < 7 then ret := FALSE; return; end if;
+	if from > 18 and to <= 18 then ret := TRUE; return; end if;
+	if from > 12 and to <= 12 then ret := TRUE; return; end if;
+	if from >  6 and to <=  6 then ret := TRUE; return; end if;
+	ret := FALSE;
+end sub;
+
+sub fiftytworule implements f2 is
+	 # endgame 
+	var p: int16;
+
+	if from < 7 then ret := FALSE; return; end if;   # not in inner table! 
+	p := from % 6;
+	if p == 0 then ret := TRUE; end if; 		# improve the six 
+	if p != 5 then    # best improve under five 
+	 	if to % 6 < 3 then 
+			ret := TRUE;
+		else
+			ret := FALSE;
+		end if;	
+	end if;
+end sub;
+
+# these evaluations are universally applicable, last resort moves 
+
+sub gohome implements f2 is
+	 # always go home if you can 
+	if to == MYHOME then
+		ret := TRUE;
+	else
+		ret := FALSE;
+	end if;
+end sub;
+
+sub scatter implements f2 is
+  	# scatter, esp. in the endgame 
+	if plainstupid(from) == TRUE or unwise(to) == TRUE then ret := FALSE; end if;
+	if get_point_stones(from as uint8) > 1 and get_point_stones(to as uint8) == 0 then
+		ret := TRUE;
+	else
+		ret := FALSE;
+	end if;
+end sub;
+
+sub runnerup implements f2 is
+	if from < 10 or from > 18 then
+		ret := FALSE;
+	else
+		ret := TRUE;
+	end if;
+end sub;
+
+sub run implements f2 is 
+	ret := TRUE;
+end sub;
+
+
+# clockwise and counterclock make a 1-stone choice on rules of thumb 
+
+# set vf2 before calling...
+sub counterclock(): (ret: uint8) is
+	var i: int16;
+	var j: int16;
+
+	i := 0;
+	while i < 2 loop 
+		j := 1;
+		while j < 25 loop
+			if get_list(i,j) != ERROR then
+				if (vf2)( j, get_list(i,j) ) == TRUE then
+					lurch( j, get_list(i,j), i);
+					ret := TRUE; return;
+				end if;
+			end if;
+			j := j + 1;
+		end loop;
+		i := i + 1;
+	end loop;
+
+	ret := FALSE;
+end sub;
+
+# set vf2 before calling...
+sub clockwise(): (ret: uint8) is
+	var i: int16;
+	var j: int16;
+
+	i := 0;
+	while i < 2 loop
+		j := 25;
+		while j > 0 loop
+			if get_list(i,j) != ERROR then
+				if (vf2)( j, get_list(i,j) ) == TRUE then
+					lurch( j, get_list(i,j), i);
+					ret := TRUE; return;
+				end if;
+			end if;
+			j := j - 1;
+		end loop;
+		i := i + 1;
+	end loop;
+
+	ret := FALSE;
+end sub;
+
+#-------------------------------------------
+#  Make Prime                               
+#-------------------------------------------
+
+var prmchk: int16;
+
+sub buildprime implements f4 is
+	clrpend();
+
+	# check for the doubles bug 
+	if get_dice(0) == get_dice(1) and get_point_stones(f1 as uint8) < 2 then 
+		ret := FALSE; return; 
+	end if;
+
+	# look for the combination 
+	if t1 == prmchk and t2 == prmchk then setpend(f2,t2); end if;
+
+	# stick like glue to a made point, but doubles may move forward 
+	if get_dice(0) != get_dice(1) then 
+		if f2 < 8 and get_point_stones(f2 as uint8) == 2 then clrpend(); end if;
+		if f1 < 8 and get_point_stones(f1 as uint8) == 2 then clrpend(); end if;
+	end if;
+
+	ret := pending.flag;
+end sub;
+
+var tab: int16[] := { ERROR,1,2,3,20,22,24,9,4,6,8,5,7 }; 
+
+sub makeprime(): (ret: uint8) is
+	var i: int16;
+ 
+	i := 12;
+	while i > 0 loop
+		prmchk := tab[i as uint8]; 
+		i := i - 1;
+		if get_point_stones(prmchk as uint8) > 1 then 
+			continue;
+		else
+			vf4 := buildprime; if matchup() == TRUE then ret := TRUE; return; end if;
+		end if;
+	end loop;
+
+	ret := FALSE;
+end sub;
+
+sub coverprime implements f2 is
+	if to == prmchk and get_point_owner(prmchk as uint8) == ME and get_point_stones(from as uint8) != 2 then
+		ret := TRUE;
+	else
+		ret := FALSE;
+	end if;
+end sub;
+
+sub cleanup(): (ret: uint8) is
+	var i: int16;
+ 
+	i := 12;
+	while i > 0 loop
+		prmchk := tab[i as uint8]; 
+		i := i - 1;
+		if get_point_stones(prmchk as uint8) != 1 then 
+			continue;
+		else
+			vf2 := coverprime;		
+ 			if counterclock() == TRUE then
+				ret := TRUE; return; 
+			end if;
+		end if;
+	end loop;
+
+	ret := FALSE;
+end sub;
+
+#-------------------------------------
+# Walking Prime                       
+#-------------------------------------
+
+sub swivelhips implements f2 is
+	if from > prmchk then
+		ret := TRUE;
+	else
+		ret := FALSE;
+	end if;
+end sub;
+
+sub slink implements f2 is
+	if from > prmchk and get_point_stones(to as uint8) == 1 then
+		ret := TRUE;
+	else
+		ret := FALSE;
+	end if;
+end sub;
+
+sub weasel(): (ret: uint8) is
+	vf2 := slink;
+	if clockwise() == TRUE then
+		ret := TRUE; return;
+	end if;
+
+	vf2 := swivelhips;
+	if counterclock() == TRUE then 
+		ret := TRUE; return;
+	end if;
+
+	vf2 := run;
+	if clockwise() == TRUE then
+		ret := TRUE; return;
+	end if;
+
+	ret := FALSE;
+end sub;
+
+sub ihaveprime(from: int16): (ret : uint8) is
+	var i: int16;
+	var to: int16;
+	var ez: int16;
+
+	ez := 0;
+	i := 0;
+	while i < 6 loop
+		to := from - i;
+		if get_point_owner(to as uint8) == ME and get_point_stones(to as uint8) > 1 then 
+			ez := ez + 1; 
+		end if;
+		i := i + 1;
+	end loop;
+
+	if ez > 4 then
+		ret := TRUE;
+	else
+		ret := FALSE;
+	end if;
+end sub;
+
+sub walkingprime(): (ret: uint8) is 
+# looks for the walking prime anywhere in the front tables 
+# then tries to bring up a runner from behind the prime,   
+# ensuring that a back stone WILL move before a front one  
+	var i: int16;
+
+	i := 12;
+	while i > 5 loop
+		if ihaveprime(i) == TRUE then
+			prmchk := i;
+			if weasel() == TRUE then ret := TRUE; return; end if;
+		end if;
+		i := i - 1;
+	end loop;
+
+	ret := FALSE;
+end sub;
+
+#---------- Book Moves ----------
+# only valid if my move is first 
+#--------------------------------
+
+sub zip(a: int16, b:int16, c:int16, d:int16): (ret: uint8) is
+	lurch(a,b,0);
+	lurch(c,d,0);
+	set_movesleft(0); 
+	ret := TRUE;
+end sub;
+
+sub zoom(a: int16, b:int16, c:int16, d:int16, e: int16, f:int16, g:int16, h:int16): (ret:uint8) is
+	var dummy: uint8;
+	set_myturns(0); dummy := zip(a,b,c,d); dummy := zip(e,f,g,h); ret := TRUE;
+end sub;
+
+sub book0(a: int16, b: int16): (ret: uint8) is 
+	case a is
+		when 1: 
+			 case b is
+				when 1: ret := zoom(8,7,8,7,6,5,6,5); return;
+				when 2: ret := zip(24,23,13,11); return;
+				when 3: ret := zip(8,5,6,5); return;
+				when 4: ret := zip(24,23,13,9); return;
+				when 5: ret := zip(24,23,13,8); return;
+				when 6: ret := zip(13,7,8,7); return;
+			end case;
+		when 2: case b is
+				when 2: ret := zoom(6,4,6,4,13,11,13,11); return;
+				when 3: ret := zip(13,11,13,10); return;
+				when 4: ret := zip(8,4,6,4); return;
+				when 5: ret := zip(13,8,13,11); return;
+				when 6: ret := zip(24,18,13,11); return;
+			end case;
+		when 3: case b is
+				when 3: ret := zoom(13,10,13,10,10,7,10,7); return;
+				when 4: ret := zip(13,10,13,9); return;
+				when 5: ret := zip(13,10,13,8); return;
+				when 6: ret := zip(24,18,13,10); return;
+			end case;
+		when 4: case b is
+				when 4: ret := zoom(13,9,13,9,24,20,24,20); return;
+				when 5: ret := zip(13,8,13,9); return;
+				when 6: ret := zip(24,18,18,14); return;
+			end case;
+		when 5: case b is
+				when 5: ret := zoom(13,8,13,8,8,3,8,3); return;
+				when 6: ret := zip(24,18,18,13); return;
+			end case;
+		when 6: ret := zoom(13,7,13,7,24,18,24,18); return;
+	end case;
+end sub;
+
+sub book1(a: int16, b: int16): (ret: uint8) is # mostly follows Becker 
+	case a is
+		when 1: case b is
+				when 1: ret := zoom(8,7,8,7,6,5,6,5); return;
+				when 2: ret := zip(13,11,6,5); return;
+				when 3: ret := zip(8,5,6,5); return;
+				when 4: ret := zip(13,9,6,5); return;
+				when 5: ret := zip(13,8,6,5); return;
+				when 6: ret := zip(13,7,8,7); return;
+			end case;
+		when 2: case b is
+				when 2: ret := zoom(6,4,6,4,13,11,13,11); return;
+				when 3: ret := zip(13,11,13,10); return;
+				when 4: ret := zip(8,4,6,4); return;
+				when 5: ret := zip(13,8,13,11); return;
+				when 6: ret := zip(13,7,7,5); return;
+			end case;
+		when 3: case b is
+				when 3: ret := zoom(13,10,13,10,8,5,8,5); return;
+				when 4: ret := zip(13,10,13,9); return;
+				when 5: ret := zip(13,8,8,5); return;
+				when 6: ret := zip(13,7,13,10); return;
+			end case;
+		when 4: case b is
+				when 4: ret := zoom(13,9,13,9,9,5,9,5); return;
+				when 5: ret := zip(13,8,13,9); return;
+				when 6: ret := zip(13,7,13,9); return;
+			end case;
+		when 5: case b is
+				when 5: ret := zoom(13,8,13,8,8,3,8,3); return;
+				when 6: ret := zip(13,7,13,8); return;
+			end case;
+		when 6: ret := zoom(13,7,13,7,24,18,24,18); return;
+	end case;
+end sub;
+
+sub book2(a: int16, b: int16): (ret: uint8) is # mostly follows Becker 
+	case a is
+		when 1: case b is
+				when 1: ret := zoom(8,7,8,7,6,5,6,5); return;
+				when 2: ret := zip(13,11,24,23); return;
+				when 3: ret := zip(8,5,6,5); return;
+				when 4: ret := zip(13,9,24,23); return;
+				when 5: ret := zip(13,8,24,23); return;
+				when 6: ret := zip(13,7,8,7); return;
+			end case;
+		when 2: case b is
+				when 2: ret := zoom(6,4,6,4,24,23,24,23); return;
+				when 3: ret := zip(13,11,13,10); return;
+				when 4: ret := zip(8,4,6,4); return;
+				when 5: ret := zip(13,8,13,11); return;
+				when 6: ret := zip(13,7,13,11); return;
+			end case;
+		when 3: case b is
+				when 3: ret := zoom(13,10,13,10,10,7,10,7); return;
+				when 4: ret := zip(13,10,13,9); return;
+				when 5: ret := zip(13,8,8,5); return;
+				when 6: ret := zip(13,7,13,10); return;
+			end case;
+		when 4: case b is
+				when 4: ret := zoom(13,9,13,9,9,5,9,5); return;
+				when 5: ret := zip(13,8,13,9); return;
+				when 6: ret := zip(13,7,13,9); return;
+			end case;
+		when 5: case b is
+				when 5: ret := zoom(13,8,13,8,8,3,8,3); return;
+				when 6: ret := zip(13,7,13,8); return;
+			end case;
+		when 6: ret := zoom(13,7,13,7,24,18,24,18); return;
+	end case;
+end sub;
+
+sub book(): (ret: uint8) is
+	var a: int16;
+	var b: int16;
+
+	if get_firstmove() == FALSE then ret := FALSE; return; end if;
+
+	set_firstmove(FALSE);
+
+					# a = min(dice[0],dice[1]);
+					# b = max(dice[0],dice[1]);
+	if get_dice(0) < get_dice(1) then
+		a := get_dice(0); b := get_dice(1);
+	else
+		a := get_dice(1); b := get_dice(0);
+	end if;
+
+	case level is
+		when 0: ret := book0(a,b);
+		when 1: ret := book1(a,b);
+		when 2: ret := book2(a,b);
+	end case;
+end sub;
+
+#====== MyMove ======
+
+sub torve() is
+	if makeprime() == TRUE then return; # this will use doubles, if it can 
+	elseif walkingprime() == TRUE then return; # i have six prime points, so run!!! 
+	elseif get_dice(0) == get_dice(1) then	      # this is too easy! 
+		vf2 := kamikaze; if counterclock() == TRUE then return; end if;
+		vf2 := dbuild; if counterclock() == TRUE then return; end if; # claim new turf 
+		vf2 := run; if clockwise() == TRUE then return; end if;
+	elseif cleanup() == TRUE then return; # cover my single blot on prime points 
+	elseif bearoff() == TRUE then # I'm ready, but you're in the back game! 
+		vf2 := gohome; if counterclock() == TRUE then return; end if;
+		vf2 := run; if clockwise() == TRUE then	return; end if; 
+	else
+		vf2 := hitandrun; if clockwise() == TRUE then return; end if;
+		vf4 := natural;	if matchup() == TRUE then return; end if; 
+		vf2 := landonme; if clockwise() == TRUE then return; end if;
+		vf2 := runnerup; if counterclock() == TRUE then return; end if;
+		vf2 := scatter; if clockwise() == TRUE then return; end if;
+		vf2 := run; if clockwise() == TRUE then return; end if;
+	end if;
+end sub;
+
+sub villiers() is
+	if makeprime() == TRUE then return; # this will use doubles, if it can 
+	elseif walkingprime() == TRUE then return; # i have six prime points, so run!!! 
+	elseif get_dice(0) == get_dice(1) then	      # this is too easy! 
+		vf2 := kamikaze; if counterclock() == TRUE then return; end if;
+		vf2 := dbuild; if counterclock() == TRUE then return; end if; # claim new turf 
+		vf2 := run; if clockwise() == TRUE then return; end if;
+	elseif cleanup() == TRUE then return; # cover my single blot on prime points 
+	elseif bearoff() == TRUE then # I'm ready, but you're in the back game! 
+		vf2 := gohome; if counterclock() == TRUE then return; end if;
+		vf2 := run; if clockwise() == TRUE then	return; end if; 
+	else
+		vf2 := foolsdemise; if clockwise() == TRUE then return; end if;
+		vf2 := idareyou; if clockwise() == TRUE then return; end if;
+		vf2 := covermine; if counterclock() == TRUE then return; end if;
+		vf4 := natural;	if matchup() == TRUE then return; end if; 
+		vf2 := landonme; if clockwise() == TRUE then return; end if;
+		vf2 := runnerup; if clockwise() == TRUE then return; end if;
+		vf2 := scatter; if clockwise() == TRUE then return; end if;
+		vf2 := run; if clockwise() == TRUE then return; end if;
+	end if;
+end sub;
+
+sub louisa() is
+	if makeprime() == TRUE then return; # this will use doubles, if it can 
+	elseif walkingprime() == TRUE then return; # i have six prime points, so run!!! 
+	elseif get_dice(0) == get_dice(1) then	      # this is too easy! 
+		vf2 := kamikaze; if counterclock() == TRUE then return; end if;
+		vf2 := dbuild; if counterclock() == TRUE then return; end if; # claim new turf 
+		vf2 := run; if clockwise() == TRUE then return; end if;
+	elseif cleanup() == TRUE then return; # cover my single blot on prime points 
+	elseif bearoff() == TRUE then # I'm ready, but you're in the back game! 
+		vf2 := gohome; if counterclock() == TRUE then return; end if;
+		vf2 := run; if clockwise() == TRUE then	return; end if; 
+	elseif (naked() == FALSE and goodboard() == TRUE) or yourfolly() == TRUE then 
+		vf2 := hitandrun; if clockwise() == TRUE then return; end if;
+		vf4 := natural;	if matchup() == TRUE then return; end if; 
+		vf2 := landonme; if clockwise() == TRUE then return; end if;
+		vf2 := runnerup; if counterclock() == TRUE then return; end if;
+		vf2 := scatter; if clockwise() == TRUE then return; end if;
+		vf2 := run; if clockwise() == TRUE then return; end if;
+	else
+		vf2 := foolsdemise; if clockwise() == TRUE then return; end if;
+		vf2 := idareyou; if clockwise() == TRUE then return; end if;
+		vf2 := covermine; if counterclock() == TRUE then return; end if;
+		vf4 := natural;	if matchup() == TRUE then return; end if; 
+		vf2 := landonme; if clockwise() == TRUE then return; end if;
+		vf2 := runnerup; if clockwise() == TRUE then return; end if;
+		vf2 := scatter; if clockwise() == TRUE then return; end if;
+		vf2 := run; if clockwise() == TRUE then return; end if;
+	end if; 					   
+end sub;
+
+sub mymove() @extern("mymove") is
+	var d: int16;
+	var dummy: uint8;
+
+	if nomove() == TRUE then
+		if get_lookforit() == TRUE and get_dice(0) != get_dice(1) then
+			set_lookforit(FALSE);
+			print("\t... ");
+			case level is
+				when 0: print("!!!");
+				when 1: print("!!!"); 
+				when 2: print("!!!");
+			end case;
+
+			restoreboard();
+			update(); 
+
+			# put the high die in list zero 
+			d := get_dice(0); set_dice(0, get_dice(1)); set_dice(1, d);
+
+			set_cantuse(ERROR); set_movesleft(2); set_myturns(1);
+
+			case level is
+				when 0: setchat("I move");
+				when 1: setchat("Let's try");
+				when 2: setchat("Move is");
+			end case;
+			debug(get_chatter());
+			prmchk := 12;
+			dummy := weasel();
+			# the rules say, use both dice if you can, or  
+			# the highest if one or the other but not both 
+		else
+			set_lookforit(TRUE);
+			strcat(get_chatter()," and now I'm blocked ");
+			set_myturns(0);
+			set_movesleft(0);
+		end if;
+	elseif book() == TRUE then
+		return;
+	elseif pending.flag == TRUE then
+		lurch( pending.fr, pending.to, 1 );
+		clrpend();
+	elseif endgame() == TRUE then		      # very solid tactics here!! 
+		vf2 := gohome; if clockwise() == TRUE then return; end if;
+		vf2 := nobackgammon; if clockwise() == TRUE then return; end if; # no excuse! 
+		vf2 := crosstable; if clockwise() == TRUE then return; end if;
+		vf2 := fiftytworule; if clockwise() == TRUE then return; end if;
+		vf2 := scatter; if clockwise() == TRUE then return; end if;
+		vf2 := run; if clockwise() == TRUE then return; end if; 
+	elseif get_point_stones(MYBAR) > 0 then         # I'm on the bar! 
+		vf2 := hitandrun; if clockwise() == TRUE then return; end if;    # wreak havoc, please 
+		vf2 := run; if clockwise() == TRUE then return; end if;     # note: uses low die first 
+	else 
+		case level is
+			when 0: villiers();
+			when 1: louisa();
+			when 2: torve();
+		end case;
+	end if;
+end sub;

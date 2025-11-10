@@ -1,0 +1,1 @@
+cowgol -b -o -lcowgol misc.coo backgm.cow backaux.cow bacmain.cow backfile.as
