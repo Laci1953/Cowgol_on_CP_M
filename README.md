@@ -54,9 +54,10 @@ HiTech's LINK is used to link the object files and build the final executable.
 The following executables are needed:
  - $EXEC.COM , the "batch processor" from the HiTech's C compiler, who launches all the subsequent executables from the Cowgol toolchain
  - COWGOL.COM (a modified variant of the HiTech's C.COM), the component that interprets the command line and feeds into $EXEC run requests for the subsequent executables from the Cowgol toolchain
- - COWFE.COM , the "cowgol front end", who parses the source file, part of the Cowgol compiler, optimized 
- - COWBE.COM , the "cowgol back end", who builds the "cowgol object file", part of the Cowgol compiler, optimized
- - COWLINK.COM , the "cowgol linker", who binds all the "cowgol object files" and outputs a Z80 assembler file, part of the Cowgol compiler, optimized
+ - COWFE.COM , the "cowgol front end", who parses the source file, part of the Cowgol compiler
+ - COWFE1.COM and COWFE2.COM, needed only when the option -B is used (COWFE1 contains the “lexer” part and COWFE2 contains the “parser” part of COWFE; they use a temporary file to pass data from the “lexer” to the “parser”, but are able to process larger files compared with the original COWFE)
+ - COWBE.COM , the "cowgol back end", who builds the "cowgol object file", part of the Cowgol compiler
+ - COWLINK.COM , the "cowgol linker", who binds all the "cowgol object files" and outputs a Z80 assembler file, part of the Cowgol compiler
  - COWFIX.COM , interface to Z80AS , who performs code optimizations
  - Z80AS.COM ( see https://github.com/Laci1953/Z80AS ), the assembler, who assembles the output of Cowfix and any assembler file included in the command line, producing HiTech compatible object files
  - LINK.COM , the HiTech's linker, who builds the final executable, using as input the object files and, if requested, the library file and producing the final executable
