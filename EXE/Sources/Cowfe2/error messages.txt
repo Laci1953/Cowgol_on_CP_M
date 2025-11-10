@@ -1,0 +1,46 @@
+1 cannot use an untyped constant in this context
+2 pointers may only appear on the LHS of an addition or subtraction
+3 number required on LHS of shift
+4 cannot open output file
+5 cannot close output file
+6 number required
+7 LHS of shift can only be constant if the RHS is also constant
+8 I/O error
+9 bad fold
+10 lvalue required
+11 pointer or lvalue required
+12 @next and @prev only work on pointers
+13 only constant values are allowed here
+14 out of order static initialisation
+15 types cannot be inferred for untyped constants
+16 you can only assign scalars
+17 nothing to break to
+18 nothing to continue to
+19 case only works on numbers
+20 when else must go last
+21 only one when else allowed
+22 cast between pointer and non-pointer of different size
+23 you cannot take the address of scalar variables
+24 array expected
+25 cannot dereference non-pointers
+26 array indices must be numbers
+27 invalid integer type range
+28 simple type or variable name expected
+29 subroutines called as functions must have exactly one output parameter
+30 subroutine requires output arguments
+31 too many output arguments
+32 you can only assign to lvalues
+33 too few output arguments
+34 type is not an interface
+35 not a subroutine
+36 subroutine already implemented
+37 cannot implement subroutine here
+38 static initialisers only work on arrays or records
+39 you can't statically initialise an inherited record
+40 initialiser must be an number
+41 initialiser must be a string
+42 initialiser of wrong type
+43 initialiser of wrong type
+44 braced initialised can only initialise arrays or records
+45 you can only emit references to variables, subroutines, or constants
+46 node stack overflow
