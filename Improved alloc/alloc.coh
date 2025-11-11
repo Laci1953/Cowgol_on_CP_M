@@ -1,5 +1,5 @@
-@decl sub init_mem() @extern("init_mem");
 @decl sub malloc(size: uint16): (ret: [uint8]) @extern("malloc");
 @decl sub free(p: [uint8]) @extern("free");
 @decl sub realloc(p: [uint8], size: uint16): (ret: [uint8]) @extern("realloc");
 @decl sub total_free(): (ret:uint16) @extern("total_free");
+
