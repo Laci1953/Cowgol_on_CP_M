@@ -493,7 +493,7 @@ With few exceptions, all the files needed to build the Cowgol compiler's compone
 
 (one of the exceptions is the file parser.coh, from the Cowfe sources, which can be built, in the current version, only by using the LEMON tool on Unix machines).
 
-See the file "Compiling the compiler.txt" for a log of compiling, on CP/M, the Cowfe & Cowbe sources (a customized set of Cowfe & Cowbe was used, on a 512KB RAM CP/M computer).
+See the file "Compiling the compiler.txt" for a log of compiling, on CP/M, the Cowfe & Cowbe sources (a customized Cowgol compiler was used for this purpose, on a 512 KB RAM CP/M computer).
 
 # Why a Cowgol development environment was needed for Z80 CP/M?
 ---------------------------------------------------------------
