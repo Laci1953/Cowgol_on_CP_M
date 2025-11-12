@@ -110,17 +110,26 @@ See as examples the folder GAMES/Backgammon/Version for 64 KB RAM and GAMES/Star
 # Folders
 ---------
 
-The EXE folder contains all the needed executables (as HEX files, ready to be LOAD-ed) and the source files for the Cowgol command line processor (cowgol.c) and for Cowfix (cowfix.c and fix.as).
+The EXE folder contains all the needed executables (as HEX files, ready to be LOAD-ed).
+You may find there also the source files for the Cowgol command line processor (cowgol.c) and for the Cowfe, Cowfe1, Cowfe2, Cowbe and Cowlink.
 
 The 128_512_KB folder contains executables provided for computers with 128KB or 512KB computers, including those running ROMWBW.
+You may find there also the source files for the customised Cowfe.
+
+The COWFIX folder contains the sources for Cowfix.
 
 The INCLUDE folder contains cowgol include files (.coh) to be used when building cowgol-based applications.
 
 The LIBRARIES folder contains cowgol user libraries (*.coo) to be used when building cowgol-based applications.
+You may find there also the source files for these libraries.
 
 The GAMES folder contains some computer games, rewritten in Cowgol.
+There are several games: Adventure, Backgammon, Bowling, KnightsTour, Queens, Startrek, Tetris.
 
-The EXAMPLES folder contains examples of Cowgol compilation sessions and details related on how to mix Cowgol C and assembler.
+The EXAMPLES folder contains examples of Cowgol compilation sessions and details related on how to mix Cowgol, C and assembler.
+
+The IMPROVED ALLOC contains an improved memory allocation package.
+Compared with the original (malloc.coh) it offers a better use of the available memory (smaller fragmentation).
 
 # Structure of the Cowgol applications
 ------------------------------------------
