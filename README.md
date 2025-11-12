@@ -113,6 +113,9 @@ The games from the GAMES folder need to be compiled using this enhanced version 
 -------------------------------------------------------
 
 If your computer is provided with only 64 KB RAM, you can still be able to compile large enough Cowgol source files, using the -B option in the command line.
+In this case, instead of running Cowfe as the first step of the compilation, the Cowfe1 (lexer) & Cowfe2 (parser) will be executed instead.
+More exactly, the execution flowchart will be: <cowgol source file> --> cowfe1 --> COWFE.$$$ temporary file --> cowfe2 --> cowbe --> cowlink --> cowfix --> Z80AS --> LINK --> .COM
+
 See as examples the folder GAMES/Backgammon/Version for 64 KB RAM and GAMES/Startrek/Version for 64 KB RAM.
 
 # Folders
