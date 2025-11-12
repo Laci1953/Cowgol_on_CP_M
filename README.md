@@ -72,7 +72,7 @@ The following executables are needed: (they belong to the HiTech C toolset and t
  - OPTIM.COM , the HiTech's C compiler optimizer (needed only when C source files will be compiled)
  - LIBR.COM , the HiTech's librarian (needed only to build and manage .lib libraries)
 
-Also, the library file "cowgol.coo" must be present.
+Also, the library file "cowgol.coo" and the include files .coh specified in the Cowgol source fileds must be present on the current disk.
 
 The sequence of execution of all these components is:
 
