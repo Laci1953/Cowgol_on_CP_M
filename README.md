@@ -486,6 +486,15 @@ You may find a lot of interesting Cowgol programs here: https://rosettacode.org/
 
 Select one of the 164 programs, then select on the left panel the Cowgol language, and you will see the source code of the program.
 
+# Compiling the compiler
+------------------------
+
+With few exceptions, all the files needed to build the Cowgol compiler's components are available and can be used to compile the compiler, on CP/M.
+
+(one of the exceptions is the file parser.coh, from the Cowfe sources, which can be built, in the current version, only by using the LEMON tool on Unix machines).
+
+See the file "Compiling the compiler.txt" for a log of compiling, on CP/M, the Cowfe & Cowbe sources (a customized set of Cowfe & Cowbe was used, on a 512KB RAM CP/M computer).
+
 # Why a Cowgol development environment was needed for Z80 CP/M?
 ---------------------------------------------------------------
 
