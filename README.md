@@ -14,6 +14,8 @@ To compile or to build an executable, on CP/M, starting from Cowgol source files
 
 COWGOL [-B] [-C] [-Mfile] [-Lfile] [-Tfile] [-O] [-S] [-X] file1.ext ... [ filen.ext ]
 
+	where file1.ext ... filen.ext are the source files.
+
 More than one source file may be specified (with name extensions: .cow = cowgol source file, .c = C source file, .as = assembler source file)
 
 The files with name extension .cow (Cowgol source files) will be compiled using the Cowgol compiler, 
