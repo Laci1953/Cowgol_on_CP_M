@@ -77,8 +77,11 @@ Also, the library file "cowgol.coo" must be present.
 The sequence of execution of all these components is:
 
 -Cowgol source files >> COWFE >> COWBE >> COWLINK >> COWFIX >> Z80AS >> .OBJ file
+
 -C source files >> CPP >> P1 >> CGEN >> OPTIM >> Z80AS >> .OBJ file
+
 -Z80 assembler source files >> Z80AS >> .OBJ file
+
 then .OBJ object files & .LIB library files >> LINK >> .COM file
 
 # Folders
