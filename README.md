@@ -84,6 +84,14 @@ The sequence of execution of all these components is:
 
 then .OBJ object files & .LIB library files >> LINK >> .COM file
 
+# Debugging executables built with this development environment
+
+It is possible to debug executables built from Cowgol (and, possible, C & assembler) source files.
+
+For this purpose, you must use the -S option, which allows Cowlink to list a map of the Cowgol subroutines and variables used in these subroutines, with their exact addresses.
+This will allow you to locate the exact addresses where the Cowgol variables are stored.
+See below the VARIABLES MAP chapter.
+
 # COWGOL for Z80 computers provided with 128/512 KB RAM
 -------------------------------------------------------
 
@@ -148,7 +156,6 @@ Variant 5: the source file contains 'include .coh' statements, and these .coh fi
 
 Of course, Cowgol and C and/or assembler files can be also mixed (see the EXAMPLES folder)
 
- 
 # Variables map (compile option -S)
 ---------------------------
 
