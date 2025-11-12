@@ -14,6 +14,12 @@ To compile or to build an executable starting from Cowgol source files (and, opt
 
 COWGOL [-B] [-C] [-Mfile] [-Lfile] [-Tfile] [-O] [-S] [-X] file1.ext ... [ filen.ext ]
 
+More than one source file may be specified (with name extensions: .cow = cowgol source file, .c = C source file, .as = assembler source file)
+
+The files with name extension .cow (Cowgol source files) will be compiled using the Cowgol compiler, 
+the files with name extension .c (C source files) will be compiled using the HiTech C compiler 
+and the files with name extension .as (Z80 assembler source files) will be assembled using the Z80AS assembler.
+
 If the option -C is specified, the files will be only compiled/assembled.
 
 If the option -C is not specified, the files will be first compiled/assembled, then linked into a CP/M executable (named after the first cowgol file in the list).
@@ -39,9 +45,8 @@ Cowgol source file (~ 20KB, ~1000 lines) ?
 We should try in this case to use the -B option, instructing the compiler to use custom Cowfe components that will be perhaps able to process this file
 (see as an example the game “bowling” in the GAMES folder, which needs -B when compiling-it, otherwise it will fail, reporting ‘Out of memory’).
 
-More than one source file may be specified (with extensions: .cow = cowgol source file, .c = C source file, .as = assembler source file)
-
-Also, C or AS object files (with extension .obj) and Cowgol object files (with extension .coo) may be specified. 
+Also, C or AS object files (with extension .obj) and Cowgol object files (with extension .coo) may be specified.
+They will be linked by the HiTech linker into the final executable, along with the Cowgol object file.
 
 The first source file must be a Cowgol source file.
 
@@ -51,7 +56,7 @@ C and assembler routines may be called from the cowgol source files (see the fol
 
 HiTech's LINK is used to link the object files and build the final executable.
 
-The following executables are needed:
+The following executables are needed: (they belong to the HiTech C toolset and the Cowgol compiler)
  - $EXEC.COM , the "batch processor" from the HiTech's C compiler, who launches all the subsequent executables from the Cowgol toolchain
  - COWGOL.COM (a modified variant of the HiTech's C.COM), the component that interprets the command line and feeds into $EXEC run requests for the subsequent executables from the Cowgol toolchain
  - COWFE.COM , the "cowgol front end", who parses the source file, part of the Cowgol compiler
@@ -69,6 +74,12 @@ The following executables are needed:
 
 Also, the library file "cowgol.coo" must be present.
 
+The sequence of execution of all these components is:
+
+-Cowgol source files >> COWFE >> COWBE >> COWLINK >> COWFIX >> Z80AS >> .OBJ file
+-C source files >> CPP >> P1 >> CGEN >> OPTIM >> Z80AS >> .OBJ file
+-Z80 assembler source files >> Z80AS >> .OBJ file
+then .OBJ object files & .LIB library files >> LINK >> .COM file
 
 # Folders
 ---------
