@@ -84,6 +84,29 @@ The sequence of execution of all these components is:
 
 then .OBJ object files & .LIB library files >> LINK >> .COM file
 
+# COWGOL for Z80 computers provided with 128/512 KB RAM
+-------------------------------------------------------
+
+The Cowgol compiler fails to compile very large cowgol source files.
+
+That is caused by the small amount of RAM memory available to the compiler to store the data structures involved in the compilation.
+
+For sources larger than a few hundred lines, the first step of the compiler issuess a fatal error message: "Out of memory".
+
+I solved the problem, at least for the Z80-based computers provided with 128/512 KB RAM, including computers running CP/M under ROMWBW (version >= 3.5.0).
+
+I modified the first step of the compiler (COWFE.COM), enabling-it to store part of the data on the "extended" RAM space, beyond the "main" 64KB.
+
+The new compiler components are in the 128_512_KB folder.
+
+The games from the GAMES folder need to be compiled using this enhanced version of the Cowgol compiler, on a 128/512 KB RAM Z80 computer (but there are versions of these games that can be compiled also on 64 KB RAM computers).
+
+# COWGOL for Z80 computers provided with 64 KB RAM
+-------------------------------------------------------
+
+If your computer is provided with only 64 KB RAM, you can still be able to compile large enough Cowgol source files, using the -B option in the command line.
+See as examples the folder GAMES/Backgammon/Version for 64 KB RAM and GAMES/Startrek/Version for 64 KB RAM.
+
 # Folders
 ---------
 
@@ -99,8 +122,7 @@ The GAMES folder contains some computer games, rewritten in Cowgol.
 
 The EXAMPLES folder contains examples of Cowgol compilation sessions and details related on how to mix Cowgol C and assembler.
 
-
-# The structure of the Cowgol applications
+# Structure of the Cowgol applications
 ------------------------------------------
 
 There are more than one way to configure a Cowgol project.
@@ -432,29 +454,6 @@ The gain is significant:
 
 - 10 to 20% faster
 
-
-# COWGOL for Z80 computers provided with 128/512 KB RAM
--------------------------------------------------------
-
-The Cowgol compiler fails to compile very large cowgol source files.
-
-That is caused by the small amount of RAM memory available to the compiler to store the data structures involved in the compilation.
-
-For sources larger than a few hundred lines, the first step of the compiler issuess a fatal error message: "Out of memory".
-
-I solved the problem, at least for the Z80-based computers provided with 128/512 KB RAM, including computers running CP/M under ROMWBW (version >= 3.5.0).
-
-I modified the first step of the compiler (COWFE.COM), enabling-it to store part of the data on the "extended" RAM space, beyond the "main" 64KB.
-
-The new compiler components are in the 128_512_KB folder.
-
-The games from the GAMES folder need to be compiled using this enhanced version of the Cowgol compiler, on a 128/512 KB RAM Z80 computer (but there are versions of these games that can be compiled also on 64 KB RAM computers).
-
-# COWGOL for Z80 computers provided with 64 KB RAM
--------------------------------------------------------
-
-If your computer is provided with only 64 KB RAM, you can still be able to compile large enough Cowgol source files, using the -B option in the command line.
-See as examples the folder GAMES/Backgammon/Version for 64 KB RAM and GAMES/Startrek/Version for 64 KB RAM.
 
 # Examples of Cowgol programs
 -----------------------------
