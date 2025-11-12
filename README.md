@@ -448,7 +448,7 @@ I modified the first step of the compiler (COWFE.COM), enabling-it to store part
 
 The new compiler components are in the 128_512_KB folder.
 
-All the games from the GAMES folder need to be compiled using this enhanced version of the Cowgol compiler, on a 128/512 KB RAM Z80 computer.
+The games from the GAMES folder need to be compiled using this enhanced version of the Cowgol compiler, on a 128/512 KB RAM Z80 computer (but there are versions of these games that can be compiled also on 64 KB RAM computers).
 
 # COWGOL for Z80 computers provided with 64 KB RAM
 -------------------------------------------------------
