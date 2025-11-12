@@ -117,7 +117,7 @@ In this case, instead of running Cowfe as the first step of the compilation, the
 
 More exactly, the execution flowchart will be: 
 
-<cowgol source file> --> cowfe1 --> COWFE.$$$ temporary file --> cowfe2 --> cowbe --> cowlink --> cowfix --> Z80AS --> LINK --> .COM
+cowgol source file --> cowfe1 --> COWFE.$$$ temporary file --> cowfe2 --> cowbe --> cowlink --> cowfix --> Z80AS --> LINK --> .COM
 
 See as examples the folder GAMES/Backgammon/Version for 64 KB RAM and GAMES/Startrek/Version for 64 KB RAM.
 
