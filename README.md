@@ -119,7 +119,7 @@ More exactly, the execution flowchart will be:
 
 cowgol source file --> cowfe1 --> COWFE.$$$ temporary file --> cowfe2 --> cowbe --> cowlink --> cowfix --> Z80AS --> LINK --> .COM
 
-See as examples the folder GAMES/Backgammon/Version for 64 KB RAM and GAMES/Startrek/Version for 64 KB RAM.
+For Cowgol source files that can be compiled this way, see as examples the folder GAMES/Backgammon/Version for 64 KB RAM and GAMES/Startrek/Version for 64 KB RAM.
 
 # Folders
 ---------
