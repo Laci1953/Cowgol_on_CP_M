@@ -12,7 +12,7 @@ Also, a small User manual for this development environment is included.
 
 To compile or to build an executable starting from Cowgol source files (and, optionally, C & assembler files), the following command is used:
 
-COWGOL [-C] [-Mfile] [-Lfile] [-Tfile] [-O] [-S] [-X] file1.ext ... [ filen.ext ]
+COWGOL [B] [-C] [-Mfile] [-Lfile] [-Tfile] [-O] [-S] [-X] file1.ext ... [ filen.ext ]
 
 If the option -C is specified, the files will be only compiled/assembled.
 
