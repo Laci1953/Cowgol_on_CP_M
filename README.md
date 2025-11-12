@@ -536,6 +536,7 @@ Sample of COWFIX statistics ( when compiling the Adventure game):
  	DONE!
 
 # UPDATES
+------------------------------
 
 (updated on 19 October, 2025 - aligned to the current version of the Cowgol language site)
 
