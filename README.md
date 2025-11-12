@@ -450,6 +450,11 @@ The new compiler components are in the 128_512_KB folder.
 
 All the games from the GAMES folder need to be compiled using this enhanced version of the Cowgol compiler, on a 128/512 KB RAM Z80 computer.
 
+# COWGOL for Z80 computers provided with 64 KB RAM
+-------------------------------------------------------
+
+If your computer is provided with only 64 KB RAM, you can still be able to compile large enough Cowgol source files, using the -B option in the command line.
+See as examples the folder GAMES/Backgammon/Version for 64 KB RAM and GAMES/Startrek/Version for 64 KB RAM.
 
 # Examples of Cowgol programs
 -----------------------------
