@@ -199,7 +199,7 @@ Here is a fragment of the Cowgol command log , when building "hexdump.com" :
 
 	(the -S option is used to build the cowgol variables map)
 	(the -O option is used to optimize the assembler code produced by Cowlink...)
-	(the -T option is used by the LINK linker to build the s.sym file containing the variables and their values)
+	(the -T option is used  to build the s.sym file containing the variables and their values)
 
 ------------------------------------
 	D>cowgol -o -s -ts hexdump.cow
