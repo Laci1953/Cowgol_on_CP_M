@@ -25,7 +25,7 @@ To compile or to build an executable, on CP/M, starting from Cowgol source files
 
 COWGOL [-B] [-C] [-Mfile] [-Lfile] [-Tfile] [-O] [-S] [-X] file1.ext ... [ filen.ext ]
 
-	where file1.ext ... filen.ext are the source files.
+where file1.ext ... filen.ext are the source files.
 
 Example: 
 
