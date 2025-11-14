@@ -4,7 +4,12 @@ Cowgol, C & assembler development environment hosted on Z80 computers running CP
 
 You will find here a complete Cowgol development environment, hosted on CP/M, for Z80 computers.
 
-Cowgol is a programming language for very small systems, including Z80 computers ( see https://github.com/davidgiven/cowgol ).
+Cowgol is a programming language for very small systems, including Z80 computers, invented by David Given ( see https://github.com/davidgiven/cowgol ).
+He is also the author of the Cowgol compiler.
+
+To popularize this programming language among the retro computing community, for owners of Z80 computers running CP/M 2.2, I decided to build this development environment.
+
+Thus, those willing to develop programs written in Cowgol will have a simple-to-use, command-line facility that allows the compilation of Cowgol sources and the construction of the final executable.
 
 A small Cowgol programming language manual is included.
 
