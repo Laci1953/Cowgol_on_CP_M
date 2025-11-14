@@ -1,5 +1,7 @@
 The Bowling game is a good example of using code stored in HiTech libraries.
 
+It runs on any Z80 machine provided with a VT100 compatible terminal.
+
 It must be compiled, on any CP/M 64 KB RAM computer, using the following command line:
 
 >cowgol -b -o -lcowgol bowling.cow
