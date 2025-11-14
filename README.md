@@ -28,7 +28,9 @@ COWGOL [-B] [-C] [-Mfile] [-Lfile] [-Tfile] [-O] [-S] [-X] file1.ext ... [ filen
 	where file1.ext ... filen.ext are the source files.
 
 Example: 
+
 COWGOL test.cow
+
 will first compile the Cowgol source file named 'test.cow' then will execute all the necessary steps (assembly, link) to build the final executable 'test.com'.
 
 More than one source file may be specified (with name extensions: .cow = cowgol source file, .c = C source file, .as = assembler source file)
