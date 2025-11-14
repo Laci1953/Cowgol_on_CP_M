@@ -11,11 +11,13 @@ To popularize this programming language among the retro computing community, for
 
 Thus, those willing to develop programs written in Cowgol will have a simple-to-use, command-line facility that allows the compilation of Cowgol sources and the construction of the final executable.
 
+This development environment also allows the construction of programs by combining Cowgol, C and Z80 assembler sources.
+
 A small Cowgol programming language manual is included.
 
 Also, a small User manual for this development environment is included.
 
-To compile or to build an executable, on CP/M, starting from Cowgol source files (and, optionally, C & assembler files), the following command is used:
+To compile or to build an executable, on CP/M, starting from Cowgol source files (and, optionally, C & assembler files), the following command must be used:
 
 COWGOL [-B] [-C] [-Mfile] [-Lfile] [-Tfile] [-O] [-S] [-X] file1.ext ... [ filen.ext ]
 
