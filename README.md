@@ -552,7 +552,7 @@ Therefore, the output of COWLINK (after passing through a preliminary filter) is
 # UPDATES
 ------------------------------
 
-(updated on March, 2025 - aligned to the last version found on the Cowgol site)
+(updated on March, 2025 - aligned to the last version found on the David Given's Cowgol site)
 
 (updated on 19 May, 2025 - fixed a bug in COWFIX, occuring when more than one return value is used for a sub)
 
@@ -578,7 +578,7 @@ Sample of COWFIX statistics ( when compiling the Adventure game):
  	13707 input source lines processed
  	DONE!
 
-(updated on 19 October, 2025 - aligned to the current version of the Cowgol language site)
+(updated on 19 October, 2025 - aligned to the current version of the David Given's Cowgol language site)
 
 - the new 'nil' keyword is now supported
 - Cowbe code generation optimizations
@@ -590,6 +590,8 @@ Updated files:
  /128_512_KB : cowfe128.hex, cowfe512.hex, cowfeall.hex, cowfewbw.hex
 
 (updated on 5 November, 2025)
+
+Added the option -B, allowing the compilation of larger Cowgol source files on 64 KB RAM computers.
 
 Updated files:
   /EXE : cowgol.hex, cowfe1.hex, cowfe2.hex
