@@ -11,7 +11,7 @@ To popularize this programming language among the retro computing community, for
 
 Thus, those willing to develop programs written in Cowgol will have a simple-to-use, command-line facility that allows the compilation of Cowgol sources and the construction of the final executable.
 
-This development environment also allows the construction of programs by combining Cowgol, C and Z80 assembler sources.
+This development environment also allows the construction of programs by combining Cowgol, C and Z80 assembler source files.
 
 A small Cowgol programming language manual is included.
 
