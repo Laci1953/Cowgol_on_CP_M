@@ -10,7 +10,9 @@ To popularize this programming language among the retro computing community, for
 
 Thus, those willing to develop programs written in Cowgol will have a simple-to-use, command-line facility that allows the compilation of Cowgol sources and the construction of the final executable.
 
-This development environment also allows the construction of programs by combining Cowgol, C and Z80 assembler source files.
+This development environment also allows combining Cowgol, C and Z80 assembler source files.
+The EXAMPLES folder contains several cases of calling Z80 assembler routines from Cowgol and calling C routines from Cowgol.
+Compatibility between these languages ​​is ensured by using a common object code format.
 
 A small Cowgol programming language manual is included.
 
@@ -24,6 +26,10 @@ To compile or to build an executable, on CP/M, starting from Cowgol source files
 COWGOL [-B] [-C] [-Mfile] [-Lfile] [-Tfile] [-O] [-S] [-X] file1.ext ... [ filen.ext ]
 
 	where file1.ext ... filen.ext are the source files.
+
+Example: 
+COWGOL test.cow
+will first compile the Cowgol source file named 'test.cow' then will execute all the necessary steps (assembly, link) to build the final executable 'test.com'.
 
 More than one source file may be specified (with name extensions: .cow = cowgol source file, .c = C source file, .as = assembler source file)
 
@@ -549,7 +555,7 @@ Instead, when using the present development environment, all that's needed to bu
 The full cowgol toolchain will be executed, followed by assembling the resulting assembler file and linking-it to the myfile.com executable.
 
 I opted to use as support the HiTech's toolchain, because the HiTech source files were available and I had a good enough expertise in using the HiTech tools. 
-Therefore, the output of COWLINK (after passing through a preliminary filter) is assembled by Z80AS (a substitute for ZAS, the original HiTech Z80 assembler), then the object file is processed by LINK, to obtain as a final result the .COM file.
+Therefore, the output of COWLINK (after passing through a preliminary filter) is assembled by Z80AS (a substitute for ZAS, the original HiTech Z80 assembler), then the object file is processed by HiTech's LINK, to obtain as a final result the .COM file.
 
 # UPDATES
 ------------------------------
