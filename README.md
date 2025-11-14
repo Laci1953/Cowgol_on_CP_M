@@ -8,7 +8,7 @@ He is also the author of the Cowgol compiler.
 
 To popularize this programming language among the retro computing community, for owners of Z80 computers running CP/M 2.2, I decided to build this development environment.
 
-Thus, those willing to develop programs written in Cowgol will have a simple-to-use, command-line facility that allows the compilation of Cowgol sources and the construction of the final executable.
+Thus, those willing to develop programs written in Cowgol on CP/M will have a simple-to-use, command-line facility that allows the compilation of Cowgol sources and the construction of the final executable.
 
 This development environment also allows combining Cowgol, C and Z80 assembler source files.
 The EXAMPLES folder contains several cases of calling Z80 assembler routines from Cowgol and calling C routines from Cowgol.
