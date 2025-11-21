@@ -1,0 +1,9 @@
+oneint8-1: yes
+oneint8-2: yes
+oneint16-1: yes
+oneint16-2: yes
+oneint32-1: yes
+oneint32-2: yes
+inout8: yes
+inout16: yes
+multiout: yes

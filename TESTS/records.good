@@ -1,0 +1,28 @@
+r1.a==1: yes
+r1.b==~0: yes
+r1.c==2: yes
+r1.d==3: yes
+r2.a==0: yes
+r2.b.a==0: yes
+r2.b.b==0: yes
+r2.c==0: yes
+rp.a==0: yes
+rp.b==0: yes
+rp.c==1: yes
+rp.d==0: yes
+r4.a==0: yes
+r4.b[0]==0: yes
+r4.b[1]==1: yes
+r4.b[2]==0: yes
+r4.c==0: yes
+p==&r: yes
+p.next==&r: yes
+p.next.next==&r: yes
+left.a == 1: yes
+left.b == 2: yes
+right.a == 1: yes
+right.c == 2: yes
+r.a==12345678: yes
+p.a==12345678: yes
+p.a==87654321: yes
+r.a==87654321: yes
