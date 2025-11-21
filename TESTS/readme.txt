@@ -1,4 +1,4 @@
-The series of tests from David Given's site
+The series of Cowgol compiler tests from David Given's site
 
 Compile them with : submit compile
 
