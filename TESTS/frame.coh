@@ -1,0 +1,3 @@
+sub yes() is print(": yes\n"); end sub;
+sub no() is print(": no\n"); end sub;
+

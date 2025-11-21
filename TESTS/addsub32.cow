@@ -1,0 +1,79 @@
+include "cowgol.coh";
+include "frame.coh";
+
+const THREE := 0x0330_0303;
+const TWO := 0x0220_0202;
+const ONE := 0x0110_0101;
+const FF := 0x0000_FFFF;
+const FF1 := 0x0001_0000;
+const ZERO := 0;
+const MONE := -ONE;
+const MTWO := -TWO;
+const MTHREE := -THREE;
+
+var mthree: int32 := MTHREE;
+var mtwo: int32 := MTWO;
+var mone: int32 := MONE;
+var zero: int32 := ZERO;
+var ff: int32 := FF;
+var ff1: int32 := FF1;
+var one: int32 := ONE;
+var two: int32 := TWO;
+var three: int32 := THREE;
+
+sub add_test() is
+    print("one+two==three"); if one+two==three then yes(); else no(); end if;
+    print("one+mtwo==mone"); if one+mtwo==mone then yes(); else no(); end if;
+    print("one+one==two"); if one+one==two then yes(); else no(); end if;
+    print("zero+one==one"); if zero+one==one then yes(); else no(); end if;
+    print("ff+one==ff1"); if ff+1==ff1 then yes(); else no(); end if;
+    print("two+mtwo==zero"); if two+mtwo==zero then yes(); else no(); end if;
+
+    print("one+TWO==three"); if one+TWO==three then yes(); else no(); end if;
+    print("one+MTWO==mone"); if one+MTWO==mone then yes(); else no(); end if;
+    print("one+ONE==two"); if one+ONE==two then yes(); else no(); end if;
+    print("zero+ONE==one"); if zero+ONE==one then yes(); else no(); end if;
+    print("two+MTWO==zero"); if two+MTWO==zero then yes(); else no(); end if;
+
+    print("ONE+two==three"); if ONE+two==three then yes(); else no(); end if;
+    print("ONE+mtwo==mone"); if ONE+mtwo==mone then yes(); else no(); end if;
+    print("ONE+one==two"); if ONE+one==two then yes(); else no(); end if;
+    print("ZERO+one==one"); if ZERO+one==one then yes(); else no(); end if;
+    print("TWO+mtwo==zero"); if TWO+mtwo==zero then yes(); else no(); end if;
+end sub;
+add_test();
+
+sub sub_test() is
+    print("one-two==mone"); if one-two==mone then yes(); else no(); end if;
+    print("one-mtwo==three"); if one-mtwo==three then yes(); else no(); end if;
+    print("one-one==zero"); if one-one==zero then yes(); else no(); end if;
+    print("ff1-one==ff"); if ff1-1==ff then yes(); else no(); end if;
+    print("zero-one==mone"); if zero-one==mone then yes(); else no(); end if;
+    print("two-mone==three"); if two-mone==three then yes(); else no(); end if;
+
+    print("one-TWO==mone"); if one-TWO==mone then yes(); else no(); end if;
+    print("one-MTWO==three"); if one-MTWO==three then yes(); else no(); end if;
+    print("one-ONE==zero"); if one-ONE==zero then yes(); else no(); end if;
+    print("zero-ONE==mone"); if zero-ONE==mone then yes(); else no(); end if;
+    print("two-MONE==three"); if two-MONE==three then yes(); else no(); end if;
+
+    print("ONE-two==mone"); if ONE-two==mone then yes(); else no(); end if;
+    print("ONE-mtwo==three"); if ONE-mtwo==three then yes(); else no(); end if;
+    print("ONE-one==zero"); if ONE-one==zero then yes(); else no(); end if;
+    print("ZERO-one==mone"); if ZERO-one==mone then yes(); else no(); end if;
+    print("TWO-mone==three"); if TWO-mone==three then yes(); else no(); end if;
+
+	var i: int32 := 0x2ff;
+	print("0x2ff-1==0x2fe"); if i-1==0x2fe then yes(); else no(); end if;
+end sub;
+sub_test();
+
+sub neg_test() is
+    print("-two == mtwo");  if -two == mtwo then yes(); else no(); end if;
+    print("-one == mone");  if -one == mone then yes(); else no(); end if;
+    print("-zero == zero"); if -zero == zero then yes(); else no(); end if;
+    print("-mone == one");  if -mone == one then yes(); else no(); end if;
+    print("-mtwo == two");  if -mtwo == two then yes(); else no(); end if;
+end sub;
+neg_test();
+

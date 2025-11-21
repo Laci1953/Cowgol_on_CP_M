@@ -1,0 +1,162 @@
+include "cowgol.coh";
+include "frame.coh";
+
+sub test_simple_record() is
+	record TestRecord is
+		a: uint8;
+		b: uint16;
+		c: uint8;
+		d: uint8;
+	end record;
+
+	var r1: TestRecord;
+	r1.a := 1;
+	r1.b := ~0;
+	r1.c := 2;
+	r1.d := 3;
+
+	print("r1.a==1"); if r1.a == 1 then yes(); else no(); end if;
+	print("r1.b==~0"); if r1.b == ~0 then yes(); else no(); end if;
+	print("r1.c==2"); if r1.c == 2 then yes(); else no(); end if;
+	print("r1.d==3"); if r1.d == 3 then yes(); else no(); end if;
+end sub;
+
+sub test_nested_record() is
+	record InnerRecord is
+		a: uint8;
+		b: uint16;
+	end record;
+
+	record OuterRecord is
+		a: uint8;
+		b: InnerRecord;
+		c: uint8;
+	end record;
+
+	var r2: OuterRecord;
+	r2.a := 0;
+	r2.b.a := 0;
+	r2.b.b := 1;
+	r2.c := 0;
+
+	print("r2.a==0"); if r2.a == 0 then yes(); else no(); end if;
+	print("r2.b.a==0"); if r2.b.a == 0 then yes(); else no(); end if;
+	print("r2.b.b==0"); if r2.b.b == 1 then yes(); else no(); end if;
+	print("r2.c==0"); if r2.c == 0 then yes(); else no(); end if;
+end sub;
+
+sub test_pointer() is
+	record TestRecord is
+		a: uint8;
+		b: uint16;
+		c: uint8;
+		d: uint8;
+	end record;
+
+	var r3: TestRecord;
+	var rp := &r3;
+	rp.a := 0;
+	rp.b := 0;
+	rp.c := 1;
+	rp.d := 0;
+
+	print("rp.a==0"); if rp.a == 0 then yes(); else no(); end if;
+	print("rp.b==0"); if rp.b == 0 then yes(); else no(); end if;
+	print("rp.c==1"); if rp.c == 1 then yes(); else no(); end if;
+	print("rp.d==0"); if rp.d == 0 then yes(); else no(); end if;
+end sub;
+
+sub test_with_array() is
+	record TestRecord is
+		a: uint8;
+		b: uint8[10];
+		c: uint8;
+	end record;
+
+	var r4: TestRecord;
+	r4.a := 0;
+	r4.b[0] := 0;
+	r4.b[1] := 1;
+	r4.b[2] := 0;
+	r4.c := 0;
+
+	print("r4.a==0"); if r4.a == 0 then yes(); else no(); end if;
+	print("r4.b[0]==0"); if r4.b[0] == 0 then yes(); else no(); end if;
+	print("r4.b[1]==1"); if r4.b[1] == 1 then yes(); else no(); end if;
+	print("r4.b[2]==0"); if r4.b[2] == 0 then yes(); else no(); end if;
+	print("r4.c==0"); if r4.c == 0 then yes(); else no(); end if;
+end sub;
+
+sub test_chain_pointer() is
+	record Pointer is
+		next: [Pointer];
+	end record;
+
+	var r: Pointer;
+	r.next := &r;
+	var p := &r;
+
+	print("p==&r"); if p == &r then yes(); else no(); end if;
+	print("p.next==&r"); if p.next == &r then yes(); else no(); end if;
+	print("p.next.next==&r"); if p.next.next == &r then yes(); else no(); end if;
+end sub;
+
+sub test_inherited_records() is
+	record Base is
+		a: uint8;
+	end record;
+
+	record Left : Base is
+		b: uint8;
+	end record;
+
+	record Right : Base is
+		c: uint32;
+	end record;
+
+	var left: Left;
+	left.a := 1;
+	left.b := 2;
+
+	var right: Right;
+	right.a := 1;
+	right.c := 2;
+
+	print("left.a == 1"); if left.a == 1 then yes(); else no(); end if;
+	print("left.b == 2"); if left.b == 2 then yes(); else no(); end if;
+	print("right.a == 1"); if right.a == 1 then yes(); else no(); end if;
+	print("right.c == 2"); if right.c == 2 then yes(); else no(); end if;
+end sub;
+
+sub test_int32_access() is
+	record Record is
+		padding: uint8[10];
+		a: uint32;
+	end record;
+
+	var r: Record;
+
+	print("r.a==12345678");
+	r.a := 12345678;
+	if r.a == 12345678 then yes(); else no(); end if;
+
+	var p := &r;
+	print("p.a==12345678");
+	if p.a == 12345678 then yes(); else no(); end if;
+
+	p.a := 87654321;
+	print("p.a==87654321");
+	if p.a == 87654321 then yes(); else no(); end if;
+
+	print("r.a==87654321");
+	if r.a == 87654321 then yes(); else no(); end if;
+end sub;
+
+test_simple_record();
+test_nested_record();
+test_pointer();
+test_with_array();
+test_chain_pointer();
+test_inherited_records();
+test_int32_access();
+
