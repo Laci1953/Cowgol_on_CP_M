@@ -164,7 +164,7 @@ The EXAMPLES folder contains examples of Cowgol compilation sessions and details
 The IMPROVED ALLOC contains an improved memory allocation package.
 Compared with the original (malloc.coh) it offers a better use of the available memory (smaller fragmentation).
 
-The TESTS contains the series of tests taken from the David Given's site
+The TESTS contains the series of tests writtten by David Given to check the implementation of various features of the Cowgol language.
 
 # Structure of the Cowgol applications
 ------------------------------------------
